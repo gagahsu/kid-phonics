@@ -1,0 +1,12 @@
+pig
+spider
+table
+bamboo
+bubble_tea
+ruler
+boat
+fork
+giraffe
+bed
+lion
+book

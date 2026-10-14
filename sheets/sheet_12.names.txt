@@ -1,0 +1,10 @@
+basket
+door
+potted_plant
+pillow
+soup
+wolf
+bee
+whale
+ear
+earrings

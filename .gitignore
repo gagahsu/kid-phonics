@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# crop.py output, regenerable from sheets/
+work/
+.DS_Store
+Thumbs.db

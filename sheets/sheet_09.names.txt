@@ -1,0 +1,12 @@
+eye
+sheep
+turtle
+bowl
+socks
+doll
+mosquito
+fish
+rain
+moon
+cloud
+feather

@@ -1,0 +1,12 @@
+pot
+bus
+dinosaur
+face_mask
+peacock
+chopsticks
+monkey
+hippo
+butterfly
+train
+orange
+mirror

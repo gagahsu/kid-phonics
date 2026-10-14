@@ -1,0 +1,12 @@
+strawberry
+hedgehog
+green_onion
+silkworm
+umbrella
+squirrel
+sandwich
+forest
+broom
+shirt
+chair
+duck

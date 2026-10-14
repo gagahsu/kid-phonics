@@ -1,0 +1,12 @@
+hand
+tree
+mountain
+meat
+hot_dog
+gummy
+cheese
+mouth
+soccer_ball
+zongzi
+diamond
+grass

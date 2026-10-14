@@ -1,0 +1,12 @@
+father
+cup
+steamed_bun
+pencil
+ice_cream
+apple
+crab
+plate
+ball
+horse
+hat
+mother

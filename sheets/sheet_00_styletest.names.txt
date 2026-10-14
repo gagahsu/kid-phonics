@@ -1,0 +1,12 @@
+father
+grapes
+cat
+airplane
+cake
+rabbit
+cow
+tiger
+drum
+pants
+flower
+chicken
