@@ -9,8 +9,12 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 
 /* ============ data ============ */
 let Z;           // data/zhuyin.json
+let ART = {};    // data/art.json: slug -> {cat, desc}
 let SYM = {};    // symbol -> {s, g, say, words}
+let STICKERS = []; // one per picture slug: {art, word, cat, syms}
 const GROUP_NAME = { i: '聲母', m: '介音', f: '韻母' };
+const CAT_NAME = { animal: '動物', food: '食物', plant: '植物', vehicle: '交通工具', person: '家人', body: '身體', object: '東西', sky: '天空', scene: '大自然' };
+const STAMPS = ['🐾', '⭐', '🌸', '🍓', '🐟', '🎈', '🌈', '🍀', '🐾', '🧶'];
 const ROUND = 5;
 // sounds kids typically mix up — used as distractors so practice targets real confusions
 const CONFUSE = ['ㄅㄆ', 'ㄉㄊ', 'ㄍㄎ', 'ㄓㄗ', 'ㄔㄘ', 'ㄕㄙ', 'ㄈㄏ', 'ㄋㄌ', 'ㄐㄑㄒ', 'ㄓㄐ', 'ㄔㄑ', 'ㄕㄒ',
@@ -20,8 +24,11 @@ const CONFUSE = ['ㄅㄆ', 'ㄉㄊ', 'ㄍㄎ', 'ㄓㄗ', 'ㄔㄘ', 'ㄕㄙ', '�
 const STORE = 'kidphonics.v1';
 const S = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })();
 S.settings ??= { rate: 0.8, voice: '' };
+S.settings.narrate ??= true;           // cats read instructions / praise aloud
 S.stats ??= {};                        // 'zh:ㄅ' -> {ok, bad, streak}
 S.seen ??= {};                         // 'zh:ㄅ' -> first time its page was opened (ms)
+S.stickers ??= {};                     // picture slug -> unlocked at (ms); never taken back
+S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp}
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
 const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
 function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
@@ -32,6 +39,18 @@ function record(s, firstTry) {
   if (firstTry) { st.ok++; st.streak++; } else { st.bad++; st.streak = Math.max(0, st.streak - 1); }
   save();
 }
+// a learned symbol unlocks the pictures of its words; returns the words newly unlocked
+function unlockStickers() {
+  const fresh = [];
+  for (const x of Z.symbols) if (level(x.s) === 3)
+    for (const w of x.words) {
+      const a = Z.words[w].art;
+      if (!S.stickers[a]) { S.stickers[a] = Date.now(); fresh.push(w); }
+    }
+  if (fresh.length) save();
+  return fresh;
+}
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /* ============ sound ============ */
 const HAS_TTS = 'speechSynthesis' in window;
@@ -47,7 +66,7 @@ function voiceFor() {
   const zh = zhVoices();
   return zh.find(v => /zh[-_]TW/i.test(v.lang)) || zh.find(v => /Hant/i.test(v.lang)) || zh[0] || null;
 }
-function speak(text, rate = S.settings.rate) {
+function speak(text, o = {}) {
   return new Promise(resolve => {
     if (!HAS_TTS) return resolve();
     speechSynthesis.cancel();
@@ -55,7 +74,8 @@ function speak(text, rate = S.settings.rate) {
     u.lang = 'zh-TW';
     const v = voiceFor();
     if (v) u.voice = v;
-    u.rate = rate;
+    u.rate = o.rate ?? S.settings.rate;
+    u.pitch = o.pitch ?? 1;
     let done = false;
     const end = () => { if (!done) { done = true; resolve(); } };
     u.onend = end; u.onerror = end;
@@ -63,8 +83,26 @@ function speak(text, rate = S.settings.rate) {
     speechSynthesis.speak(u);
   });
 }
-const hush = () => HAS_TTS && speechSynthesis.cancel();
+// a cancellable run of speech: {t, pitch, rate} = say it, number = pause (ms), function = await it.
+// Starting a new seq() or hush() stops the old one after its current step.
+let seqId = 0;
+async function seq(steps) {
+  const id = ++seqId;
+  for (const st of steps) {
+    if (id !== seqId) return false;
+    if (!st) continue;
+    if (typeof st === 'number') await sleep(st);
+    else if (typeof st === 'function') await st();
+    else await speak(st.t, st);
+  }
+  return id === seqId;
+}
+const hush = () => { seqId++; if (HAS_TTS) speechSynthesis.cancel(); };
 const saySym = s => speak(SYM[s].say);
+const narrate = (...steps) => S.settings.narrate ? steps : [];
+// character voices (TTS pitch): 胖胖 is the excitable one, 菲菲 the calm helper
+const PANG = { pitch: 1.4 };
+const FEI = { pitch: 1.05 };
 
 let actx;
 function tone(freqs, dur = 0.12, type = 'sine') {
@@ -105,8 +143,112 @@ function ruby(word, hi) {
 const img = (word, cls = '') => `<img class="${cls}" src="assets/img/${Z.words[word].art}.webp" alt="${esc(word)}" draggable="false">`;
 const dots = s => `<span class="dots">${[0, 1, 2].map(i => `<i class="${i < level(s) ? 'on' : ''}"></i>`).join('')}</span>`;
 
+/* ============ cats: 胖胖 (tabby & white, 麒麟尾) and 菲菲 (Russian Blue) ============ */
+// shapes come from design/cats.svg; clip paths / gradient live once in the page (CAT_DEFS)
+const CAT_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <clipPath id="ppBody"><ellipse cx="140" cy="222" rx="80" ry="62"/></clipPath>
+  <clipPath id="ppHead"><ellipse cx="140" cy="128" rx="72" ry="60"/></clipPath>
+  <clipPath id="ffEyeL"><path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z"/></clipPath>
+  <clipPath id="ffEyeR"><path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z"/></clipPath>
+  <radialGradient id="ffShade" cx=".45" cy=".35" r=".75"><stop offset="0" stop-color="#9aa3ae"/><stop offset="1" stop-color="#7a838f"/></radialGradient>
+</defs></svg>`;
+
+const PP_EYES = {
+  open: `<circle cx="112" cy="128" r="17" fill="#C2C86C" class="ol"/><circle cx="168" cy="128" r="17" fill="#C2C86C" class="ol"/>
+    <circle cx="113" cy="129" r="12" fill="#1f1d1c"/><circle cx="167" cy="129" r="12" fill="#1f1d1c"/>
+    <circle cx="108" cy="122" r="4.5" fill="#fff"/><circle cx="163" cy="122" r="4.5" fill="#fff"/>
+    <circle cx="117" cy="134" r="2" fill="#fff"/><circle cx="172" cy="134" r="2" fill="#fff"/>`,
+  oh: `<circle cx="112" cy="128" r="17" fill="#C2C86C" class="ol"/><circle cx="168" cy="128" r="17" fill="#C2C86C" class="ol"/>
+    <circle cx="112" cy="128" r="8" fill="#1f1d1c"/><circle cx="168" cy="128" r="8" fill="#1f1d1c"/>
+    <circle cx="109" cy="124" r="3" fill="#fff"/><circle cx="165" cy="124" r="3" fill="#fff"/>`,
+  happy: `<path d="M97 132 Q112 114 127 132 M153 132 Q168 114 183 132" class="ln" style="stroke-width:4.5"/>`,
+};
+const PP_MOUTH = {
+  talk: `<path d="M140 157 Q140 164 132 165 M140 157 Q140 164 148 165" class="ln"/>`,
+  oh: `<ellipse cx="140" cy="167" rx="5" ry="6.5" fill="#B8324F" class="ol" style="stroke-width:2"/>`,
+  happy: `<path d="M131 160 Q140 175 149 160Z" fill="#B8324F" class="ol" style="stroke-width:2"/>`,
+};
+function pangSVG(mood) {
+  const eyes = mood === 'happy' ? PP_EYES.happy : mood === 'oh' ? PP_EYES.oh : PP_EYES.open;
+  const mouth = PP_MOUTH[mood] || PP_MOUTH.talk;
+  return `<svg viewBox="52 26 214 270" aria-hidden="true">
+    <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#8a6c56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M222 252 l4 7" class="st"/>
+    <ellipse cx="140" cy="222" rx="80" ry="62" fill="#FBF8F3"/>
+    <g clip-path="url(#ppBody)">
+      <path d="M150 168 Q196 166 222 196 L226 290 L176 290 Q186 252 170 222 Q154 196 150 168Z" fill="#8a6c56"/>
+      <path d="M180 186 q8 6 10 16 M196 196 q6 8 6 18 M206 222 q4 8 2 18" class="st"/>
+      <ellipse cx="78" cy="236" rx="26" ry="22" fill="#8a6c56"/>
+      <path d="M68 226 q6 6 4 14 M84 222 q6 8 4 16" class="st"/>
+    </g>
+    <ellipse cx="140" cy="222" rx="80" ry="62" fill="none" class="ol"/>
+    <ellipse cx="118" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/><ellipse cx="162" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
+    <path d="M113 274v7M123 274v7M157 274v7M167 274v7" class="ln" style="stroke-width:1.8"/>
+    <path d="M84 98 L78 40 Q80 34 86 37 L124 76Z" fill="#8a6c56" class="ol"/><path d="M90 88 L87 52 L112 78Z" fill="#F4B8BE"/>
+    <path d="M196 98 L202 40 Q200 34 194 37 L156 76Z" fill="#8a6c56" class="ol"/><path d="M190 88 L193 52 L168 78Z" fill="#F4B8BE"/>
+    <ellipse cx="140" cy="128" rx="72" ry="60" fill="#FBF8F3"/>
+    <g clip-path="url(#ppHead)">
+      <path d="M60 60 H222 V114 Q206 114 192 106 Q172 94 156 94 Q148 68 140 66 Q132 68 124 94 Q108 94 88 106 Q74 114 60 118Z" fill="#8a6c56"/>
+      <path d="M120 78 q4 8 2 14 M160 78 q-4 8 -2 14 M100 86 q6 6 6 12 M180 86 q-6 6 -6 12 M134 74 v-8 M146 74 v-8" class="st"/>
+    </g>
+    <ellipse cx="140" cy="128" rx="72" ry="60" fill="none" class="ol"/>
+    ${eyes}
+    <ellipse cx="93" cy="154" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/><ellipse cx="187" cy="154" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/>
+    <path d="M132 148 Q140 144 148 148 Q142 157 140 157 Q138 157 132 148Z" fill="#EE9AA3" class="ol" style="stroke-width:2"/>
+    ${mouth}
+    <path d="M100 152 L66 146 M100 158 L66 162 M180 152 L214 146 M180 158 L214 162" class="wh"/>
+  </svg>`;
+}
+
+const FF_EYES = {
+  calm: `<path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z" fill="#B3C95E"/>
+    <path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="#B3C95E"/>
+    <g clip-path="url(#ffEyeL)"><ellipse cx="357" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
+    <g clip-path="url(#ffEyeR)"><ellipse cx="407" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
+    <path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="none" class="ol"/>
+    <path d="M337 160 Q356 150 375 157 M389 157 Q408 150 427 160" class="ln" style="stroke-width:4.5"/>
+    <circle cx="352" cy="162" r="2" fill="#fff"/><circle cx="403" cy="162" r="2" fill="#fff"/>`,
+  smile: `<path d="M343 167 Q356 153 369 167 M395 167 Q408 153 421 167" class="ln" style="stroke-width:4.5"/>`,
+  yawn: `<path d="M341 163 Q356 170 371 163 M393 163 Q408 170 423 163" class="ln" style="stroke-width:4.5"/>`,
+};
+const FF_MOUTH = {
+  calm: `<path d="M382 188 Q382 194 375 195 M382 188 Q382 194 389 195" class="ln"/>`,
+  smile: `<path d="M382 188 v3 M373 192 Q382 202 391 192" class="ln"/>`,
+  yawn: `<ellipse cx="382" cy="199" rx="7" ry="9" fill="#B8324F" class="ol" style="stroke-width:2"/>`,
+};
+function feiSVG(mood) {
+  const eyes = FF_EYES[mood] || FF_EYES.calm, mouth = FF_MOUTH[mood] || FF_MOUTH.calm;
+  return `<svg viewBox="312 26 214 270" aria-hidden="true">
+    <path d="M452 250 Q490 262 474 286 Q460 300 420 294" fill="none" stroke="#3d3330" stroke-width="20" stroke-linecap="round"/>
+    <path d="M452 250 Q490 262 474 286 Q460 300 420 294" fill="none" stroke="#838c98" stroke-width="14" stroke-linecap="round"/>
+    <ellipse cx="400" cy="224" rx="64" ry="60" fill="url(#ffShade)" class="ol"/>
+    <ellipse cx="400" cy="214" rx="26" ry="30" fill="#a9b1bb" opacity=".35"/>
+    <ellipse cx="383" cy="279" rx="15" ry="10" fill="#8d96a2" class="ol"/><ellipse cx="417" cy="279" rx="15" ry="10" fill="#8d96a2" class="ol"/>
+    <path d="M379 275v7M388 275v7M413 275v7M422 275v7" class="ln" style="stroke-width:1.8"/>
+    <g transform="translate(18 -22)">
+      <path d="M330 130 L322 70 Q324 64 330 67 L372 104Z" fill="#848d99" class="ol"/><path d="M336 120 L331 82 L360 106Z" fill="#C9AEB4"/>
+      <path d="M434 130 L442 70 Q440 64 434 67 L392 104Z" fill="#848d99" class="ol"/><path d="M428 120 L433 82 L404 106Z" fill="#C9AEB4"/>
+      <path d="M382 98 Q438 98 446 150 Q448 192 382 210 Q316 192 318 150 Q326 98 382 98Z" fill="url(#ffShade)" class="ol"/>
+      <path d="M370 108 v14 M382 106 v16 M394 108 v14" class="ln" style="opacity:.35"/>
+      <ellipse cx="382" cy="184" rx="24" ry="16" fill="#a9b1bb" opacity=".7"/>
+      ${eyes}
+      <path d="M375 180 Q382 177 389 180 Q384 188 382 188 Q380 188 375 180Z" fill="#5a5f69" class="ol" style="stroke-width:1.8"/>
+      ${mouth}
+      <path d="M356 186 L322 180 M356 192 L322 196 M408 186 L442 180 M408 192 L442 196" class="wh"/>
+    </g>
+  </svg>`;
+}
+// who: 'pang' | 'fei'; anim: '' | 'hop' | 'wobble' | 'dance'
+const catEl = (who, mood = '', anim = '') =>
+  `<span class="cat cat-${who} ${anim}" role="img" aria-label="${who === 'pang' ? '胖胖' : '菲菲'}">${who === 'pang' ? pangSVG(mood) : feiSVG(mood)}</span>`;
+function setCat(who, mood, anim = '', scope = app) {
+  const el = scope.querySelector(`.cat-${who}`);
+  if (el) el.outerHTML = catEl(who, mood, anim);
+}
+
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, settings };
+const routes = { '': home, learn, sym: symPage, practice, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -124,29 +266,90 @@ app.addEventListener('click', e => {
 });
 
 /* ============ home ============ */
+const QUIET = '<span class="tag">🤫 不用開口</span>';
 function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
+  const today = S.days[dayKey()];
+  const got = STICKERS.filter(x => S.stickers[x.art]).length;
+  const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
     <section class="hero">
-      <div class="hero-art">${['貓', '蘋果', '恐龍', '冰淇淋'].map(w => img(w)).join('')}</div>
       <h1><span>發</span><span>音</span><span>樂</span><span>園</span></h1>
-      <p>聽一聽、找一找，認識每個聲音</p>
+      <div class="duo">
+        <button class="cat-btn" data-act="hiPang" aria-label="胖胖">${catEl('pang')}</button>
+        <div class="bubble">${greet}</div>
+        <button class="cat-btn" data-act="hiFei" aria-label="菲菲">${catEl('fei')}</button>
+      </div>
     </section>
     <div class="langs" role="group" aria-label="選擇語言">
       <button class="lang" aria-pressed="true">注音</button>
       <button class="lang" disabled>ABC<small>準備中</small></button>
       <button class="lang" disabled>あいう<small>準備中</small></button>
     </div>
+    <a class="today-btn${today ? ' done' : ''}" href="#/practice/today">
+      <span class="big">${today ? today.stamp : '⭐'}</span>
+      <span><span class="t">今天的練習</span><br><span class="s">${today ? '今天的章蓋好了！想玩可以再玩' : `玩一輪 ${ROUND} 題，就能蓋一個章`}</span></span>
+    </a>
     <nav class="menu">
-      <a href="#/learn"><span class="ico">👀</span><span><span class="t">認識符號</span><br><span class="s">看圖卡、聽發音，37 個注音符號</span></span></a>
-      <a href="#/practice"><span class="ico">👂</span><span><span class="t">聽音練習</span><br><span class="s">${seenSyms().length
-        ? `練習學過的 ${seenSyms().length} 個符號，一輪 ${ROUND} 題` : '先學幾個符號，再來練習'}</span></span></a>
+      <a href="#/learn"><span class="ico">👀</span><span class="mt"><span class="t">認識符號</span><br><span class="s">看圖卡、聽發音，37 個注音符號</span></span>${QUIET}</a>
+      <a href="#/practice"><span class="ico">👂</span><span class="mt"><span class="t">聽音練習</span><br><span class="s">${seenSyms().length
+        ? `練習學過的 ${seenSyms().length} 個符號，一輪 ${ROUND} 題` : '先學幾個符號，再來練習'}</span></span>${QUIET}</a>
+      <a href="#/stickers"><span class="ico">🎁</span><span class="mt"><span class="t">我的貼紙簿</span><br><span class="s">已收集 ${got} / ${STICKERS.length} 張</span></span></a>
     </nav>
+    ${calendar()}
     <div class="progress">
       <div class="row"><span>學會的符號（連續答對 3 次）</span><b>${learned} / ${Z.symbols.length}</b></div>
       <div class="meter"><i style="width:${learned / Z.symbols.length * 100}%"></i></div>
     </div>`;
+  const bounce = el => { const c = el.querySelector('.cat'); c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop'); };
+  // name = first spelling lesson: ㄆ ㄤˋ 胖 / ㄈ ㄟ 菲
+  ACT.hiPang = el => {
+    bounce(el);
+    seq([{ t: '嗨！我是胖胖。', ...PANG }, () => saySym('ㄆ'), 150, () => saySym('ㄤ'), 150, { t: '胖！', ...PANG },
+      { t: learned ? `我們已經學會${learned}個注音了！` : '我還不太會注音，你可以陪我練習嗎？', ...PANG }]);
+  };
+  ACT.hiFei = el => {
+    bounce(el);
+    seq([{ t: '我是菲菲。', ...FEI }, () => saySym('ㄈ'), 150, () => saySym('ㄟ'), 150, { t: '菲。', ...FEI },
+      { t: today ? '今天的章蓋好了，好棒。' : '每天玩一輪，就能蓋一個章喔。', ...FEI }]);
+  };
+}
+
+// this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
+function calendar() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  const lead = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate();
+  let cells = '<i class="pad"></i>'.repeat(lead), count = 0;
+  for (let d = 1; d <= n; d++) {
+    const rec = S.days[dayKey(new Date(y, m, d))];
+    if (rec) count++;
+    cells += `<i class="${rec ? 'on' : ''}${d === now.getDate() ? ' today' : ''}">${rec ? rec.stamp : d}</i>`;
+  }
+  return `<div class="cal">
+    <div class="cal-h"><b>${m + 1} 月的印章</b><span>蓋了 ${count} 天</span></div>
+    <div class="cal-g">${[...'日一二三四五六'].map(w => `<i class="wk">${w}</i>`).join('')}${cells}</div>
+  </div>`;
+}
+
+/* ============ sticker book ============ */
+function stickers() {
+  const got = STICKERS.filter(x => S.stickers[x.art]).length;
+  const cats = [...new Set([...Object.keys(CAT_NAME), ...STICKERS.map(x => x.cat)])];
+  const sections = cats.map(c => {
+    const list = STICKERS.filter(x => x.cat === c);
+    if (!list.length) return '';
+    const have = list.filter(x => S.stickers[x.art]).length;
+    return `<h3 class="group-h">${CAT_NAME[c] || c}<small>${have} / ${list.length}</small></h3>
+      <div class="stk-grid">${list.map(x => S.stickers[x.art]
+        ? `<button class="stk" data-act="stk" data-w="${esc(x.word)}">${img(x.word)}<span class="cap">${ruby(x.word)}</span></button>`
+        : `<button class="stk lock" data-act="stkLock" data-s="${x.syms[0]}" aria-label="還沒拿到，學會 ${x.syms[0]} 就能拿到">${img(x.word)}<span class="need g-${SYM[x.syms[0]].g}">${x.syms[0]}</span></button>`).join('')}</div>`;
+  }).join('');
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的貼紙簿</h2></div>
+    <p class="legend">已收集 <b>${got}</b> / ${STICKERS.length} 張。注音符號學會了（★），它的貼紙就會跑進來。</p>
+    ${sections}`;
+  ACT.stk = el => { flash(el); seq([{ t: el.dataset.w }]); };
+  ACT.stkLock = el => seq([{ t: '學會', ...FEI }, () => saySym(el.dataset.s), { t: '，就能拿到這張貼紙喔。', ...FEI }]);
 }
 
 /* ============ learn: all symbols ============ */
@@ -206,7 +409,14 @@ let poolMode = 'seen';  // 'seen' = only symbols opened in 認識符號, 'all' =
 
 // #/practice        -> pick pool (學過的 / 全部) and start
 // #/practice/ㄅ     -> straight into a round focused on ㄅ (from the symbol page)
+// #/practice/today -> one tap from home: a round over learned symbols (weakest first = review)
 function practice(focus) {
+  if (focus === 'today') {
+    if (seenSyms().length) return startRound({ mode: 'seen' });
+    go('learn');
+    setTimeout(() => seq(narrate({ t: '我們先認識幾個符號，再來練習喔。', ...FEI })), 400);
+    return;
+  }
   if (focus && SYM[focus]) { markSeen(focus); return startRound({ mode: 'seen', focus }); }
   if (G && !G.over) return renderQ();
   const seen = seenSyms();
@@ -276,9 +486,10 @@ function makeQuestions(targets) {
   });
 }
 function startRound(cfg) {
-  G = { cfg, qs: makeQuestions(roundTargets(cfg)), k: 0, results: [], over: false };
+  G = { cfg, qs: makeQuestions(roundTargets(cfg)), k: 0, results: [], over: false, told: {}, newStickers: [] };
   renderQ();
 }
+const TITLE = { A: '聽聲音，找到它！', B: '聽到哪一個音？' };
 function promptSound(q) { return q.type === 'A' ? saySym(q.t) : speak(q.w); }
 
 function renderQ() {
@@ -287,23 +498,33 @@ function renderQ() {
   q.tries = 0; q.locked = false;
   const dotsHtml = G.qs.map((_, i) => `<i class="${i < G.k ? (G.results[i] ? 'done' : 'miss') : i === G.k ? 'now' : ''}"></i>`).join('');
   const prompt = q.type === 'A'
-    ? `<p class="q-title">聽聲音，找到它！</p><div class="q-prompt"><button class="play" data-act="replay" aria-label="再聽一次">🔊</button></div>`
+    ? `<div class="q-prompt"><button class="play" data-act="replay" aria-label="再聽一次">🔊</button></div>`
     // zhuyin hidden until answered — it would give the answer away
-    : `<p class="q-title">聽到哪一個音？</p><div class="q-prompt"><button class="q-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}<span id="qword" class="zw">${esc(q.w)}</span></button></div>`;
+    : `<div class="q-prompt"><button class="q-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}<span id="qword" class="zw">${esc(q.w)}</span></button></div>`;
   app.innerHTML = `
     <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a>
       <span class="pdots" aria-label="第 ${G.k + 1} 題，共 ${G.qs.length} 題">${dotsHtml}</span><span style="width:46px"></span></div>
-    <div class="q">${prompt}
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">${TITLE[q.type]}</div></div>
+      ${prompt}
       <div class="opts">${q.opts.map(o => `<button class="opt" data-act="answer" data-o="${o}">${o}</button>`).join('')}</div>
       <div class="fb" id="fb"></div>
       <div id="next"></div>
     </div>`;
-  ACT.replay = async el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); await promptSound(q); };
+  ACT.replay = el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); seq([() => promptSound(q)]); };
   ACT.quit = () => { G = null; go(''); };
   ACT.answer = el => answer(q, el);
-  ACT.next = () => { G.k++; renderQ(); };
-  setTimeout(() => promptSound(q), 300);
+  ACT.next = () => { hush(); G.k++; renderQ(); };
+  // 菲菲 reads the instruction the first time each question type shows up in a round
+  const intro = !G.told[q.type];
+  G.told[q.type] = true;
+  setTimeout(() => {
+    // skip if the child already answered / left the page during the delay
+    if (G?.qs[G.k] !== q || q.locked || q.tries || !location.hash.startsWith('#/practice')) return;
+    seq([...(intro ? narrate({ t: TITLE[q.type], ...FEI }, 200) : []), () => promptSound(q)]);
+  }, 300);
 }
+function bubble(text) { const b = $('#bubble'); if (b) b.textContent = text; }
 
 const PRAISE = ['答對了！', '好棒！', '太厲害了！', '沒錯！', '耳朵好靈！'];
 async function answer(q, el) {
@@ -315,9 +536,12 @@ async function answer(q, el) {
     const firstTry = q.tries === 0;
     G.results[G.k] = firstTry;
     record(q.t, firstTry);
-    fb.className = 'fb good'; fb.textContent = pick(PRAISE);
+    G.newStickers.push(...unlockStickers());
+    const praise = pick(PRAISE);
+    bubble(praise); setCat('fei', 'smile', 'hop');
     lockAll(); revealWord(q);
     showNext();
+    seq([300, ...narrate({ t: praise, ...FEI })]);
   } else {
     q.tries++;
     el.classList.add('wrong'); el.disabled = true; boop();
@@ -327,12 +551,13 @@ async function answer(q, el) {
       record(q.t, false);
       app.querySelector(`.opt[data-o="${q.t}"]`).classList.add('reveal');
       fb.className = 'fb oops'; fb.textContent = `答案是「${q.t}」喔`;
+      bubble('沒關係，我們一起記起來。'); setCat('fei', 'calm', 'wobble');
       lockAll(); revealWord(q);
       showNext();
+      seq([300, ...narrate({ t: '答案是', ...FEI }), () => saySym(q.t)]);
     } else {
-      fb.className = 'fb oops'; fb.textContent = '再聽聽看～';
-      await sleep(350);
-      await promptSound(q);
+      bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+      seq([350, ...narrate({ t: '再聽聽看', ...FEI }, 150), () => promptSound(q)]);
     }
   }
 }
@@ -343,23 +568,42 @@ function showNext() {
   $('#next').innerHTML = `<button class="btn primary big" data-act="next">${last ? '看看拿了幾顆星 ⭐' : '下一題 →'}</button>`;
 }
 
+const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
+  if (G.over) return;           // re-rendered by navigation: don't count the round twice
   G.over = true;
   const stars = G.results.filter(Boolean).length;
-  const msg = stars === ROUND ? '全部答對！' : stars >= 3 ? '很棒喔！' : '多聽幾次就會了！';
+  const msg = stars === G.qs.length ? '全部答對！' : stars >= 3 ? '很棒喔！' : '多聽幾次就會了！';
+  const day = (S.days[dayKey()] ??= { rounds: 0, stamp: '' });
+  day.rounds++;
+  const firstToday = !day.stamp;
+  if (firstToday) day.stamp = pick(STAMPS);
+  save();
+  const tired = day.rounds >= REST_AT;
+  const fresh = G.newStickers;
   app.innerHTML = `
     <div class="done">
+      <div class="duo small">${catEl('pang', 'happy', 'dance')}${catEl('fei', tired ? 'yawn' : 'smile')}</div>
       <h2>${msg}</h2>
       <div class="stars" aria-label="${stars} 顆星">${G.results.map((r, i) => `<span class="${r ? 'on' : 'off'}" style="animation-delay:${i * 0.15}s">★</span>`).join('')}</div>
       <div class="recap">${G.qs.map((q, i) => `<span class="g-${SYM[q.t].g} ${G.results[i] ? 'ok' : 'no'}">${q.t}</span>`).join('')}</div>
+      ${firstToday ? `<div class="stamp-new"><span class="stamp">${day.stamp}</span><span>今天的章蓋好了！</span></div>` : ''}
+      ${fresh.length ? `<div class="new-stk"><p>拿到新貼紙！</p><div>${fresh.map((w, i) => `<span style="animation-delay:${0.6 + i * 0.12}s">${img(w)}</span>`).join('')}</div></div>` : ''}
+      ${tired ? `<p class="rest">今天已經玩了 ${day.rounds} 輪，好厲害！<br>菲菲想睡覺了，我們明天再玩吧。</p>` : ''}
       <div class="btn-row">
-        <button class="btn primary big" data-act="again">再玩一次</button>
+        <button class="btn ${tired ? '' : 'primary '}big" data-act="again">再玩一次</button>
         <a class="btn big" href="#/${G.cfg.focus ? 'sym/' + G.cfg.focus : 'learn'}">看圖卡</a>
-        <a class="btn big" href="#/">回首頁</a>
+        <a class="btn ${tired ? 'primary ' : ''}big" href="#/">回首頁</a>
       </div>
     </div>`;
   ACT.again = () => startRound(G.cfg);
   if (stars >= 3) setTimeout(() => tone([523, 659, 784, 1047], 0.16), 200);
+  seq([700, ...narrate(
+    { t: '耶！', ...PANG }, { t: msg, ...FEI },
+    firstToday && { t: '今天的練習完成了，蓋一個章！', ...FEI },
+    fresh.length && { t: '拿到新貼紙：' + fresh.join('、'), ...PANG },
+    tired && { t: '菲菲想睡覺了，我們明天再玩吧。', ...FEI, rate: S.settings.rate * 0.85 },
+  )]);
 }
 
 /* ============ settings (for parents) ============ */
@@ -378,27 +622,41 @@ function settings() {
       <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
       <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
       <p class="note">注音符號目前用代表字朗讀（例如 ㄅ 念「玻」），之後會換成真人錄音。</p>
+      <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
       <h3>練習紀錄</h3>
-      <p class="note">已學會 ${Z.symbols.filter(x => level(x.s) === 3).length} 個。答錯最多：${
+      <p class="note">已學會 ${Z.symbols.filter(x => level(x.s) === 3).length} 個・貼紙 ${STICKERS.filter(x => S.stickers[x.art]).length} / ${STICKERS.length} 張・
+        這個月練習 ${Object.keys(S.days).filter(k => k.startsWith(dayKey().slice(0, 7))).length} 天・今天 ${S.days[dayKey()]?.rounds || 0} 輪</p>
+      <p class="note">答錯最多：${
         Z.symbols.filter(x => stat(x.s).bad > 0).sort((a, b) => stat(b.s).bad - stat(a.s).bad).slice(0, 6).map(x => `${x.s}（${stat(x.s).bad}）`).join('、') || '還沒有'}</p>
+      <p class="note">紀錄只存在這台裝置的瀏覽器裡，換裝置或清除瀏覽資料就會重來。</p>
       <div class="btn-row"><button class="btn" data-act="reset">清除紀錄</button></div>
     </div>`;
+  $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
   $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rateV').textContent = S.settings.rate.toFixed(1); save(); };
   ACT.test = () => speak('玻。爸爸，杯子，包子。');
-  ACT.reset = () => { if (confirm('確定要清除所有練習紀錄嗎？')) { S.stats = {}; save(); settings(); } };
+  ACT.reset = () => { if (confirm('確定要清除所有練習紀錄（熟練度、貼紙、印章）嗎？')) { S.stats = {}; S.stickers = {}; S.days = {}; save(); settings(); } };
 }
 
 /* ============ boot ============ */
 (async () => {
   try {
-    Z = await (await fetch('data/zhuyin.json')).json();
+    [Z, ART] = await Promise.all(['data/zhuyin.json', 'data/art.json'].map(async u => (await fetch(u)).json()));
   } catch {
     app.innerHTML = '<p class="loading">資料載入失敗。請用網頁伺服器開啟（例如 <code>py -m http.server</code>），不要直接雙擊 index.html。</p>';
     return;
   }
   for (const x of Z.symbols) SYM[x.s] = x;
+  // one sticker per picture; a picture shared by several symbols (杯子: ㄅ, ㄟ) unlocks via any of them
+  const bySlug = {};
+  for (const x of Z.symbols) for (const w of x.words) {
+    const a = Z.words[w].art;
+    (bySlug[a] ??= { art: a, word: w, cat: ART[a]?.cat || 'object', syms: [] }).syms.push(x.s);
+  }
+  STICKERS = Object.values(bySlug);
+  unlockStickers();   // older saves: hand out stickers for symbols learned before the book existed
+  document.body.insertAdjacentHTML('beforeend', CAT_DEFS);
   route();
 })();
