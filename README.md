@@ -83,6 +83,14 @@ py tools/import_moe_audio.py 路徑/bopomofo_materials_20170213.zip
 
 錄音播不出來時，網站自動改用裝置語音念 `zhuyin.json` 的 `say` 代表字。
 
+`assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（ㄇㄠ = `3107-3120.mp3`）：範例詞用到的單音節（輕聲除外），
+來源 [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（錄音者 Chen Wang，README 標示 CC BY-SA，版本未載明）。
+目前用在單字詞（貓、馬…），多字詞仍用裝置語音。**改了 `zhuyin.json` 的注音後要重跑**，補上新音節：
+
+```
+py tools/import_syllables.py
+```
+
 ## 注音校對
 
 範例詞注音由 AI 初擬，2026-10-14 已逐詞比對教育部《國語辭典簡編本》（中小學用；資料 `dict_concised_2014_20260929`，

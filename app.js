@@ -139,6 +139,18 @@ async function saySym(s) {
   const r = await playClip(symUrl(s));
   if (r === false) await speak(SYM[s].say);
 }
+// audio-cmn syllable recordings, named by the zhuyin's code points: ㄅㄚˋ -> 3105-311a-2cb.mp3
+const sylUrl = zy => `assets/audio/zh/syl/${[...zy].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
+// one-character words use the syllable recording (TTS often misreads a lone character);
+// longer words stay on TTS so tone sandhi and light tones sound natural
+async function sayWord(w) {
+  const zy = Z.words[w]?.zy;
+  if (zy && !zy.includes(' ') && !zy.startsWith('˙')) {
+    if (HAS_TTS) speechSynthesis.cancel();
+    if (await playClip(sylUrl(zy)) !== false) return;
+  }
+  await speak(w);
+}
 const narrate = (...steps) => S.settings.narrate ? steps : [];
 // character voices (TTS pitch): 胖胖 is the excitable one, 菲菲 the calm helper
 const PANG = { pitch: 1.4 };
@@ -424,7 +436,7 @@ function symPage(s) {
     <div class="btn-row"><a class="btn primary big" href="#/practice/${s}">練習 ${s} 👂</a></div>`;
   markSeen(s);
   ACT.saySym = async el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); playToken++; await saySym(s); };
-  ACT.sayWord = async el => { playToken++; flash(el); await speak(el.dataset.w); };
+  ACT.sayWord = async el => { playToken++; flash(el); await sayWord(el.dataset.w); };
   ACT.sayAll = async () => {
     const my = ++playToken;
     const big = $('.big-sym'); big.classList.add('playing');
@@ -432,7 +444,7 @@ function symPage(s) {
     for (const card of app.querySelectorAll('.card')) {
       if (my !== playToken) return;
       await sleep(250);
-      flash(card); await speak(card.dataset.w);
+      flash(card); await sayWord(card.dataset.w);
     }
   };
   setTimeout(() => saySym(s), 250);
@@ -530,7 +542,7 @@ function startRound(cfg) {
   renderQ();
 }
 const TITLE = { A: '聽聲音，找到它！', B: '聽到哪一個音？' };
-function promptSound(q) { return q.type === 'A' ? saySym(q.t) : speak(q.w); }
+function promptSound(q) { return q.type === 'A' ? saySym(q.t) : sayWord(q.w); }
 
 function renderQ() {
   if (G.k >= G.qs.length) return renderDone();
@@ -678,7 +690,9 @@ function settings() {
       <p class="note"><b>注音符號</b>：2017 © 教育部，國語注音符號手冊-開放部件。依
         <a href="https://creativecommons.org/licenses/by/4.0/deed.zh_TW" target="_blank" rel="noopener">創用CC 姓名標示 4.0 國際版</a>授權使用
         （<a href="https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html" target="_blank" rel="noopener">原始出處</a>）；本站僅剪除尾端空白、調整音量。</p>
-      <p class="note"><b>詞語、句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
+      <p class="note"><b>單字的詞（貓、馬、筆…）</b>：錄音者 Chen Wang，取自
+        <a href="https://github.com/hugolpz/audio-cmn" target="_blank" rel="noopener">hugolpz/audio-cmn</a>，依創用CC 姓名標示-相同方式分享授權使用；本站剪除前後空白、調整音量。</p>
+      <p class="note"><b>其他詞語、句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };

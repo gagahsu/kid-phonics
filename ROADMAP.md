@@ -18,7 +18,7 @@
 
 | 階段 | 項目 | 依賴 | 狀態 |
 |---|---|---|---|
-| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ◐ 37 符號已上線；單音節待選 |
+| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ◐ 37 符號、185 單音節已上線（單字詞使用）；多字詞仍 TTS |
 | P0 | 0.2 排除粵語語音 | — | ☑ |
 | P1 | 1.1 指示語音化 | — | ☑ |
 | P1 | 1.2 貼紙簿 | — | ☑ |
@@ -48,16 +48,17 @@
 | 用途 | 來源 | 授權（已查證 2026-10-14） | 義務 | 狀態 |
 |---|---|---|---|---|
 | 37 個符號 | 教育部《國語注音符號手冊》數位版開放部件（[首頁](https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html) `bopomofo_materials_20170213.zip`） | **CC BY 4.0**（壓縮檔 `license.txt`；另載明視為符合政府資料開放授權條款） | 標示「2017 © 教育部，國語注音符號手冊-開放部件」＋授權連結 | ☑ 已上線 |
-| 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ☐ 待確認授權版本、試聽口音 |
-| 單音節（備援） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ☐ 待試聽 |
+| 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ☑ 已上線（家長試聽後選用，2026-10-14）；授權版本仍待確認 |
+| 單音節（未採用） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ✕ 全程低頻嗡嗡聲＋人聲很小 |
+| 單音節（未採用，可再評估） | 教育部《國語辭典簡編本》單字屬性聲音檔 `dict_concised_music_word_2014_20260929.zip`（1.5 GB，可用 HTTP Range 只抓需要的檔） | **CC BY-ND 3.0 TW**（禁止改作） | 標示出處；不可改音量／降噪，只能擷取片段、播放時以 Web Audio 增益 | ✕ 每檔約 9 秒念「字、部首、筆畫、拼讀」，需切段；音量小且不一致。結尾的「ㄅ、ㄚ、ㄅㄚˇ」拼讀可供 2.2 拼拼看參考 |
 | 詞語、句子 | 裝置內建 TTS | — | — | ☑ |
 
 - 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
-- 單音節錄音（P2 抓錯遊戲、拼拼看才需要）：兩套逐一試聽，挑較準且**接近台灣口音**的；audio-cmn 需先確認 CC BY-SA 版本，SA 只約束錄音檔本身的改作。
+- 單音節錄音：`tools/import_syllables.py` 依 `zhuyin.json` 用到的音節（輕聲除外，共 185 個）從 audio-cmn 下載轉檔，處理同符號錄音。目前用在**單字詞**（貓、馬、筆…）；多字詞仍用 TTS（變調、輕聲較自然）。之後 P2 抓錯遊戲、拼拼看直接用 `sylUrl()`。改了注音後重跑一次即可補新音節。
 
 **檔案**
 - `assets/audio/zh/sym/<碼位>.mp3`（37 檔，例 ㄅ = `3105.mp3`；用碼位避免伺服器處理非 ASCII 檔名）
-- `assets/audio/zh/syl/<注音含聲調>.mp3`（例 `ㄇㄠ.mp3`、`ㄇㄚˇ.mp3`；一聲不加符號）
+- `assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（例 ㄇㄠ = `3107-3120.mp3`、ㄇㄚˇ = `3107-311a-2c7.mp3`；一聲不加符號）
 - 不內嵌 base64（參考站整站 700KB 都是音檔），改成按需載入＋快取。
 
 **播放規格**
@@ -308,5 +309,6 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
 - 2.3 翻牌是否計入熟練度。
 - 闖關地圖段落切分依哪一版課本（康軒／翰林／南一）。
 - 胖胖、菲菲 SVG 造型定稿（草稿 `design/cats.svg`）。
-- 單音節錄音兩套來源的取捨與後製流程細節。
+- audio-cmn 的 CC BY-SA 版本（可在該 repo 開 issue 詢問）。
+- 多字詞要不要改成串接單音節錄音（要處理三聲變調、輕聲）。
 - ABC／あいう 上線後，貼紙簿與每日練習是否跨語言共用（建議共用：貼紙以 slug 為單位，本來就跨語言）。
