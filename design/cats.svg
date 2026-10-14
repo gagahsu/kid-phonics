@@ -1,19 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 360" width="1080" height="720">
-  <title>胖胖＆菲菲 造型草稿</title>
+  <title>胖胖＆菲菲 造型草稿 v2</title>
   <defs>
     <style>
       .ol{stroke:#3d3330;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
       .ln{fill:none;stroke:#3d3330;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+      .st{fill:none;stroke:#5a4536;stroke-width:2.4;stroke-linecap:round;opacity:.7}
       .wh{fill:none;stroke:#3d3330;stroke-width:1.4;stroke-linecap:round;opacity:.55}
       .name{font:700 26px "LXGW WenKai TC","Microsoft JhengHei",sans-serif;fill:#3d3330;text-anchor:middle}
       .zy{font:600 15px "Microsoft JhengHei",sans-serif;fill:#8a7a70;text-anchor:middle;letter-spacing:2px}
     </style>
-    <!-- 胖胖 -->
-    <clipPath id="pBody"><ellipse cx="140" cy="220" rx="84" ry="62"/></clipPath>
-    <clipPath id="pHead"><ellipse cx="140" cy="128" rx="74" ry="62"/></clipPath>
-    <clipPath id="pEyeL"><circle cx="111" cy="126" r="17"/></clipPath>
-    <clipPath id="pEyeR"><circle cx="169" cy="126" r="17"/></clipPath>
-    <!-- 菲菲 -->
+    <clipPath id="pBody"><ellipse cx="140" cy="222" rx="80" ry="62"/></clipPath>
+    <clipPath id="pHead"><ellipse cx="140" cy="128" rx="72" ry="60"/></clipPath>
+    <clipPath id="pEyeL"><circle cx="112" cy="128" r="17"/></clipPath>
+    <clipPath id="pEyeR"><circle cx="168" cy="128" r="17"/></clipPath>
     <clipPath id="fEyeL"><path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z"/></clipPath>
     <clipPath id="fEyeR"><path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z"/></clipPath>
     <radialGradient id="fShade" cx=".45" cy=".35" r=".75">
@@ -23,93 +22,95 @@
 
   <rect x="4" y="4" width="532" height="352" rx="28" fill="#FFF6E5"/>
 
-  <!-- ============ 胖胖（米克斯：白底＋棕灰虎斑） ============ -->
+  <!-- ============ 胖胖（米克斯：白底＋深棕虎斑，麒麟尾） ============ -->
   <g id="pangpang">
-    <!-- tail -->
-    <path d="M214 246 Q258 252 246 282 Q236 302 196 294" fill="none" stroke="#3d3330" stroke-width="21" stroke-linecap="round"/>
-    <path d="M214 246 Q258 252 246 282 Q236 302 196 294" fill="none" stroke="#9c8b7b" stroke-width="15" stroke-linecap="round"/>
-    <path d="M240 258 l8 4 M246 276 l9 1 M232 293 l4 7" class="ln" stroke-width="2.2" opacity=".6"/>
+    <!-- 麒麟尾: short, kinked, hooked tip -->
+    <path d="M206 258 Q232 262 240 246 L252 238 Q262 232 256 222" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M206 258 Q232 262 240 246 L252 238 Q262 232 256 222" fill="none" stroke="#8a6c56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M226 252 l2 9 M240 244 l7 6 M252 228 l8 2" class="st" stroke-width="2.2"/>
     <!-- body -->
-    <ellipse cx="140" cy="220" rx="84" ry="62" fill="#FBF8F3" class="ol"/>
+    <ellipse cx="140" cy="222" rx="80" ry="62" fill="#FBF8F3" class="ol"/>
     <g clip-path="url(#pBody)">
-      <path d="M50 190 Q66 152 120 160 Q152 168 140 196 Q128 222 96 236 Q70 250 58 272 L40 272Z" fill="#9c8b7b"/>
-      <path d="M68 180 q10 8 6 20 M86 170 q12 10 6 26 M104 166 q10 10 4 22" class="ln" stroke-width="2.2" opacity=".5"/>
+      <!-- big back patch down the right side (white collar left above it) -->
+      <path d="M150 168 Q196 166 222 196 L226 290 L176 290 Q186 252 170 222 Q154 196 150 168Z" fill="#8a6c56"/>
+      <path d="M180 186 q8 6 10 16 M196 196 q6 8 6 18 M206 222 q4 8 2 18" class="st"/>
+      <!-- round hip spot, lower left -->
+      <ellipse cx="78" cy="236" rx="26" ry="22" fill="#8a6c56"/>
+      <path d="M68 226 q6 6 4 14 M84 222 q6 8 4 16" class="st"/>
     </g>
-    <ellipse cx="140" cy="220" rx="84" ry="62" fill="none" class="ol"/>
+    <ellipse cx="140" cy="222" rx="80" ry="62" fill="none" class="ol"/>
     <!-- front paws -->
-    <ellipse cx="117" cy="276" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
-    <ellipse cx="163" cy="276" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
-    <path d="M112 272v7M122 272v7M158 272v7M168 272v7" class="ln" stroke-width="1.8"/>
+    <ellipse cx="118" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
+    <ellipse cx="162" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
+    <path d="M113 274v7M123 274v7M157 274v7M167 274v7" class="ln" stroke-width="1.8"/>
     <!-- ears -->
-    <path d="M82 96 L76 38 Q78 32 84 35 L124 74Z" fill="#9c8b7b" class="ol"/>
-    <path d="M88 86 L85 50 L112 76Z" fill="#F4B8BE"/>
-    <path d="M198 96 L204 38 Q202 32 196 35 L156 74Z" fill="#9c8b7b" class="ol"/>
-    <path d="M192 86 L195 50 L168 76Z" fill="#F4B8BE"/>
+    <path d="M84 98 L78 40 Q80 34 86 37 L124 76Z" fill="#8a6c56" class="ol"/>
+    <path d="M90 88 L87 52 L112 78Z" fill="#F4B8BE"/>
+    <path d="M196 98 L202 40 Q200 34 194 37 L156 76Z" fill="#8a6c56" class="ol"/>
+    <path d="M190 88 L193 52 L168 78Z" fill="#F4B8BE"/>
     <!-- head -->
-    <ellipse cx="140" cy="128" rx="74" ry="62" fill="#FBF8F3" class="ol"/>
+    <ellipse cx="140" cy="128" rx="72" ry="60" fill="#FBF8F3" class="ol"/>
     <g clip-path="url(#pHead)">
-      <!-- tabby cap with white blaze between the eyes -->
-      <path d="M60 60 H222 V112 Q206 112 192 104 Q172 92 156 92 Q148 66 140 64 Q132 66 124 92 Q108 92 88 104 Q74 112 60 116Z" fill="#9c8b7b"/>
-      <path d="M118 76 q4 8 2 14 M162 76 q-4 8 -2 14 M100 84 q6 6 6 12 M180 84 q-6 6 -6 12" class="ln" stroke-width="2.2" opacity=".5"/>
+      <!-- dark tabby cap, white blaze between the eyes -->
+      <path d="M60 60 H222 V114 Q206 114 192 106 Q172 94 156 94 Q148 68 140 66 Q132 68 124 94 Q108 94 88 106 Q74 114 60 118Z" fill="#8a6c56"/>
+      <path d="M120 78 q4 8 2 14 M160 78 q-4 8 -2 14 M100 86 q6 6 6 12 M180 86 q-6 6 -6 12 M134 74 v-8 M146 74 v-8" class="st"/>
     </g>
-    <ellipse cx="140" cy="128" rx="74" ry="62" fill="none" class="ol"/>
+    <ellipse cx="140" cy="128" rx="72" ry="60" fill="none" class="ol"/>
     <!-- big round surprised eyes -->
-    <circle cx="111" cy="126" r="17" fill="#C7C46A"/>
-    <circle cx="169" cy="126" r="17" fill="#C7C46A"/>
-    <g clip-path="url(#pEyeL)"><circle cx="112" cy="127" r="12" fill="#1f1d1c"/></g>
-    <g clip-path="url(#pEyeR)"><circle cx="168" cy="127" r="12" fill="#1f1d1c"/></g>
-    <circle cx="111" cy="126" r="17" fill="none" class="ol"/>
-    <circle cx="169" cy="126" r="17" fill="none" class="ol"/>
-    <circle cx="107" cy="120" r="4.5" fill="#fff"/><circle cx="164" cy="120" r="4.5" fill="#fff"/>
-    <circle cx="116" cy="132" r="2" fill="#fff"/><circle cx="173" cy="132" r="2" fill="#fff"/>
+    <circle cx="112" cy="128" r="17" fill="#C2C86C"/>
+    <circle cx="168" cy="128" r="17" fill="#C2C86C"/>
+    <g clip-path="url(#pEyeL)"><circle cx="113" cy="129" r="12" fill="#1f1d1c"/></g>
+    <g clip-path="url(#pEyeR)"><circle cx="167" cy="129" r="12" fill="#1f1d1c"/></g>
+    <circle cx="112" cy="128" r="17" fill="none" class="ol"/>
+    <circle cx="168" cy="128" r="17" fill="none" class="ol"/>
+    <circle cx="108" cy="122" r="4.5" fill="#fff"/><circle cx="163" cy="122" r="4.5" fill="#fff"/>
+    <circle cx="117" cy="134" r="2" fill="#fff"/><circle cx="172" cy="134" r="2" fill="#fff"/>
     <!-- blush, nose, mouth, whiskers -->
-    <ellipse cx="92" cy="152" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/>
-    <ellipse cx="188" cy="152" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/>
-    <path d="M132 146 Q140 142 148 146 Q142 155 140 155 Q138 155 132 146Z" fill="#EE9AA3" stroke="#3d3330" stroke-width="2" stroke-linejoin="round"/>
-    <path d="M140 155 Q140 162 132 163 M140 155 Q140 162 148 163" class="ln"/>
-    <path d="M100 150 L66 144 M100 156 L66 160 M180 150 L214 144 M180 156 L214 160" class="wh"/>
+    <ellipse cx="93" cy="154" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/>
+    <ellipse cx="187" cy="154" rx="10" ry="5.5" fill="#FF9FAE" opacity=".45"/>
+    <path d="M132 148 Q140 144 148 148 Q142 157 140 157 Q138 157 132 148Z" fill="#EE9AA3" stroke="#3d3330" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M140 157 Q140 164 132 165 M140 157 Q140 164 148 165" class="ln"/>
+    <path d="M100 152 L66 146 M100 158 L66 162 M180 152 L214 146 M180 158 L214 162" class="wh"/>
   </g>
 
-  <!-- ============ 菲菲（俄羅斯藍貓：全身藍灰、綠眼、稍瞇） ============ -->
+  <!-- ============ 菲菲（俄羅斯藍貓：苗條、窩在白色籃子裡） ============ -->
   <g id="feifei">
-    <!-- loaf body -->
-    <ellipse cx="414" cy="236" rx="102" ry="54" fill="url(#fShade)" class="ol"/>
-    <!-- tail wrapped along the front -->
-    <path d="M500 262 Q508 290 468 291 L420 289" fill="none" stroke="#3d3330" stroke-width="20" stroke-linecap="round"/>
-    <path d="M500 262 Q508 290 468 291 L420 289" fill="none" stroke="#838c98" stroke-width="14" stroke-linecap="round"/>
-    <!-- tucked paws -->
-    <ellipse cx="362" cy="282" rx="17" ry="9" fill="#8d96a2" class="ol"/>
-    <ellipse cx="398" cy="283" rx="17" ry="9" fill="#8d96a2" class="ol"/>
-    <!-- ears: big, wide-set -->
-    <path d="M330 130 L322 70 Q324 64 330 67 L372 104Z" fill="#848d99" class="ol"/>
-    <path d="M336 120 L331 82 L360 106Z" fill="#C9AEB4"/>
-    <path d="M434 130 L442 70 Q440 64 434 67 L392 104Z" fill="#848d99" class="ol"/>
-    <path d="M428 120 L433 82 L404 106Z" fill="#C9AEB4"/>
-    <!-- head: slightly wedge-shaped -->
-    <path d="M382 98 Q440 98 448 152 Q450 196 382 206 Q314 196 316 152 Q324 98 382 98Z" fill="url(#fShade)" class="ol"/>
-    <!-- faint forehead stripes -->
-    <path d="M370 108 v14 M382 106 v16 M394 108 v14" class="ln" stroke="#5f6773" opacity=".35"/>
-    <!-- lighter muzzle -->
-    <ellipse cx="382" cy="182" rx="26" ry="17" fill="#a9b1bb" opacity=".7"/>
-    <!-- half-lidded green almond eyes -->
-    <path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z" fill="#B3C95E"/>
-    <path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="#B3C95E"/>
-    <g clip-path="url(#fEyeL)"><ellipse cx="357" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
-    <g clip-path="url(#fEyeR)"><ellipse cx="407" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
-    <path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z" fill="none" class="ol" stroke-width="2.4"/>
-    <path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="none" class="ol" stroke-width="2.4"/>
-    <!-- heavy upper lids = the "meh" look -->
-    <path d="M338 159 Q356 151 374 157 M390 157 Q408 151 426 159" class="ln" stroke-width="4"/>
-    <circle cx="352" cy="162" r="2" fill="#fff"/><circle cx="403" cy="162" r="2" fill="#fff"/>
-    <!-- nose, mouth, whiskers -->
-    <path d="M375 178 Q382 175 389 178 Q384 186 382 186 Q380 186 375 178Z" fill="#5a5f69" stroke="#3d3330" stroke-width="1.8" stroke-linejoin="round"/>
-    <path d="M382 186 Q382 192 375 193 M382 186 Q382 192 389 193" class="ln" stroke-width="2.2"/>
-    <path d="M356 184 L322 178 M356 190 L322 194 M408 184 L442 178 M408 190 L442 194" class="wh" stroke="#e8ecf0" opacity=".8"/>
+    <!-- basket back rim -->
+    <path d="M300 214 Q300 196 318 196 H504 Q522 196 522 214" fill="#E6E4DE" class="ol"/>
+    <!-- slim back, curled up inside -->
+    <ellipse cx="378" cy="214" rx="70" ry="26" fill="url(#fShade)" class="ol"/>
+    <!-- basket front -->
+    <path d="M294 212 H528 L518 290 Q516 302 502 302 H320 Q306 302 304 290Z" fill="#F7F6F2" class="ol"/>
+    <path d="M294 212 H528" class="ln" stroke-width="7" stroke="#3d3330"/>
+    <path d="M294 212 H528" class="ln" stroke-width="3" stroke="#ffffff"/>
+    <path d="M322 236 H500" class="ln" stroke-width="1.6" opacity=".25"/>
+    <!-- head, chin resting on the rim -->
+    <g transform="translate(120 28) scale(.85)">
+      <path d="M330 130 L322 70 Q324 64 330 67 L372 104Z" fill="#848d99" class="ol"/>
+      <path d="M336 120 L331 82 L360 106Z" fill="#C9AEB4"/>
+      <path d="M434 130 L442 70 Q440 64 434 67 L392 104Z" fill="#848d99" class="ol"/>
+      <path d="M428 120 L433 82 L404 106Z" fill="#C9AEB4"/>
+      <!-- wedge head -->
+      <path d="M382 98 Q438 98 446 150 Q448 192 382 210 Q316 192 318 150 Q326 98 382 98Z" fill="url(#fShade)" class="ol"/>
+      <path d="M370 108 v14 M382 106 v16 M394 108 v14" class="ln" stroke="#5f6773" opacity=".35"/>
+      <ellipse cx="382" cy="184" rx="24" ry="16" fill="#a9b1bb" opacity=".7"/>
+      <!-- half-lidded green eyes -->
+      <path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z" fill="#B3C95E"/>
+      <path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="#B3C95E"/>
+      <g clip-path="url(#fEyeL)"><ellipse cx="357" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
+      <g clip-path="url(#fEyeR)"><ellipse cx="407" cy="165" rx="3.6" ry="9" fill="#1f1d1c"/></g>
+      <path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z" fill="none" class="ol" stroke-width="2.4"/>
+      <path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z" fill="none" class="ol" stroke-width="2.4"/>
+      <path d="M337 160 Q356 150 375 157 M389 157 Q408 150 427 160" class="ln" stroke-width="4.5"/>
+      <circle cx="352" cy="162" r="2" fill="#fff"/><circle cx="403" cy="162" r="2" fill="#fff"/>
+      <path d="M375 180 Q382 177 389 180 Q384 188 382 188 Q380 188 375 180Z" fill="#5a5f69" stroke="#3d3330" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M382 188 Q382 194 375 195 M382 188 Q382 194 389 195" class="ln" stroke-width="2.2"/>
+      <path d="M356 186 L322 180 M356 192 L322 196 M408 186 L442 180 M408 192 L442 196" class="wh" stroke="#e8ecf0" opacity=".8"/>
+    </g>
   </g>
 
-  <!-- labels -->
   <text class="name" x="140" y="324">胖胖</text>
-  <text class="name" x="400" y="324">菲菲</text>
+  <text class="name" x="410" y="330">菲菲</text>
   <text class="zy" x="140" y="348">ㄆㄤˋ ㄆㄤˋ</text>
-  <text class="zy" x="400" y="348">ㄈㄟ ㄈㄟ</text>
+  <text class="zy" x="410" y="352">ㄈㄟ ㄈㄟ</text>
 </svg>
