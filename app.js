@@ -38,12 +38,14 @@ const HAS_TTS = 'speechSynthesis' in window;
 let voices = [];
 function loadVoices() { if (HAS_TTS) voices = speechSynthesis.getVoices(); }
 if (HAS_TTS) { loadVoices(); speechSynthesis.addEventListener?.('voiceschanged', loadVoices); }
-const zhVoices = () => voices.filter(v => /^zh|^cmn/i.test(v.lang));
+// Mandarin only: zh-HK / zh-MO / yue voices speak Cantonese
+const isCantonese = v => /[-_](HK|MO)\b|yue/i.test(v.lang) || /粵|廣東|cantonese/i.test(v.name);
+const zhVoices = () => voices.filter(v => /^zh|^cmn/i.test(v.lang) && !isCantonese(v));
 function voiceFor() {
   const chosen = voices.find(v => v.voiceURI === S.settings.voice);
-  if (chosen) return chosen;
+  if (chosen && !isCantonese(chosen)) return chosen;
   const zh = zhVoices();
-  return zh.find(v => /zh[-_]TW/i.test(v.lang)) || zh.find(v => /Hant|HK/i.test(v.lang)) || zh[0] || null;
+  return zh.find(v => /zh[-_]TW/i.test(v.lang)) || zh.find(v => /Hant/i.test(v.lang)) || zh[0] || null;
 }
 function speak(text, rate = S.settings.rate) {
   return new Promise(resolve => {
