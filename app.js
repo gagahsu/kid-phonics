@@ -66,9 +66,44 @@ function voiceFor() {
   const zh = zhVoices();
   return zh.find(v => /zh[-_]TW/i.test(v.lang)) || zh.find(v => /Hant/i.test(v.lang)) || zh[0] || null;
 }
+// Recorded clips play through one <audio> element: unlike Web Audio it isn't muted by the
+// iPhone/iPad silent switch. Resolves true (played), false (failed -> caller falls back) or 'stop'.
+const player = (() => { try { const a = new Audio(); a.preload = 'auto'; return a; } catch { return null; } })();
+let clipFin = null;
+function stopClip() { if (clipFin) { try { player.pause(); } catch { /* ignore */ } clipFin('stop'); } }
+function playClip(url) {
+  return new Promise(resolve => {
+    if (!player) return resolve(false);
+    stopClip();
+    let done = false, started = false;
+    const fin = r => {
+      if (done) return; done = true; clearTimeout(tm);
+      player.onended = player.onerror = player.onplaying = null;
+      if (clipFin === fin) clipFin = null;
+      resolve(r);
+    };
+    const tm = setTimeout(() => fin(started), 4000);
+    player.onended = () => fin(true); player.onerror = () => fin(false); player.onplaying = () => { started = true; };
+    clipFin = fin;
+    player.muted = false;
+    player.src = url;
+    try { player.play()?.catch?.(() => fin(false)); } catch { fin(false); }
+  });
+}
+// iOS only lets audio start inside a user gesture: prime the element on the first tap
+['touchend', 'click'].forEach(ev => document.addEventListener(ev, function prime() {
+  document.removeEventListener('touchend', prime, true); document.removeEventListener('click', prime, true);
+  if (!player || clipFin) return;
+  player.muted = true; player.src = symUrl('ㄅ');
+  try { player.play()?.then?.(() => { player.pause(); player.muted = false; }).catch?.(() => { player.muted = false; }); } catch { player.muted = false; }
+}, true));
+// 教育部《國語注音符號手冊》recordings, named by code point: ㄅ -> 3105.mp3
+const symUrl = s => `assets/audio/zh/sym/${s.codePointAt(0).toString(16)}.mp3`;
+
 function speak(text, o = {}) {
   return new Promise(resolve => {
     if (!HAS_TTS) return resolve();
+    stopClip();
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'zh-TW';
@@ -97,8 +132,13 @@ async function seq(steps) {
   }
   return id === seqId;
 }
-const hush = () => { seqId++; if (HAS_TTS) speechSynthesis.cancel(); };
-const saySym = s => speak(SYM[s].say);
+const hush = () => { seqId++; stopClip(); if (HAS_TTS) speechSynthesis.cancel(); };
+// recording first; TTS reads the representative character (ㄅ -> 玻) only if the clip fails
+async function saySym(s) {
+  if (HAS_TTS) speechSynthesis.cancel();
+  const r = await playClip(symUrl(s));
+  if (r === false) await speak(SYM[s].say);
+}
 const narrate = (...steps) => S.settings.narrate ? steps : [];
 // character voices (TTS pitch): 胖胖 is the excitable one, 菲菲 the calm helper
 const PANG = { pitch: 1.4 };
@@ -621,7 +661,7 @@ function settings() {
       <label for="rate">速度：<b id="rateV">${S.settings.rate.toFixed(1)}</b></label>
       <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
       <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
-      <p class="note">注音符號目前用代表字朗讀（例如 ㄅ 念「玻」），之後會換成真人錄音。</p>
+      <p class="note">這裡的語音用來念詞語和句子。注音符號本身播放真人錄音（見下方「聲音從哪裡來」）；錄音播不出來時，才用這個語音念代表字（例如 ㄅ 念「玻」）。</p>
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
@@ -632,11 +672,18 @@ function settings() {
         Z.symbols.filter(x => stat(x.s).bad > 0).sort((a, b) => stat(b.s).bad - stat(a.s).bad).slice(0, 6).map(x => `${x.s}（${stat(x.s).bad}）`).join('、') || '還沒有'}</p>
       <p class="note">紀錄只存在這台裝置的瀏覽器裡，換裝置或清除瀏覽資料就會重來。</p>
       <div class="btn-row"><button class="btn" data-act="reset">清除紀錄</button></div>
+    </div>
+    <div class="panel">
+      <h3>聲音從哪裡來</h3>
+      <p class="note"><b>注音符號</b>：2017 © 教育部，國語注音符號手冊-開放部件。依
+        <a href="https://creativecommons.org/licenses/by/4.0/deed.zh_TW" target="_blank" rel="noopener">創用CC 姓名標示 4.0 國際版</a>授權使用
+        （<a href="https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html" target="_blank" rel="noopener">原始出處</a>）；本站僅剪除尾端空白、調整音量。</p>
+      <p class="note"><b>詞語、句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
   $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rateV').textContent = S.settings.rate.toFixed(1); save(); };
-  ACT.test = () => speak('玻。爸爸，杯子，包子。');
+  ACT.test = () => seq([() => saySym('ㄅ'), 250, { t: '爸爸，杯子，包子。' }]);
   ACT.reset = () => { if (confirm('確定要清除所有練習紀錄（熟練度、貼紙、印章）嗎？')) { S.stats = {}; S.stickers = {}; S.days = {}; save(); settings(); } };
 }
 

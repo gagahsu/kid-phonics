@@ -68,6 +68,21 @@ tools/               Python 工具（用 `py` 執行，python 不在 PATH）
 
 個別圖要例外，在 art.json 該項加 `"face": true` 或 `"face": false`。
 
+## 錄音
+
+`assets/audio/zh/sym/<碼位>.mp3`（ㄅ = `3105.mp3`）：37 個注音符號的真人錄音，
+來源教育部《國語注音符號手冊》數位版開放部件，**CC BY 4.0**（姓名標示：2017 © 教育部，國語注音符號手冊-開放部件）。
+網站的家長設定頁有出處說明，改動時請保留。
+
+重新產生（需要 ffmpeg）：到[手冊首頁](https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html)
+下載 `bopomofo_materials_20170213.zip`，然後
+
+```
+py tools/import_moe_audio.py 路徑/bopomofo_materials_20170213.zip
+```
+
+錄音播不出來時，網站自動改用裝置語音念 `zhuyin.json` 的 `say` 代表字。
+
 ## 待校對：注音
 
 範例詞注音由 AI 初擬，**需對照小孩使用的課本版本（康軒／翰林／南一）與教育部辭典校對**，特別是：

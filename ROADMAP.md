@@ -18,7 +18,7 @@
 
 | 階段 | 項目 | 依賴 | 狀態 |
 |---|---|---|---|
-| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ☐ |
+| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ◐ 37 符號已上線；單音節待選 |
 | P0 | 0.2 排除粵語語音 | — | ☑ |
 | P1 | 1.1 指示語音化 | — | ☑ |
 | P1 | 1.2 貼紙簿 | — | ☑ |
@@ -45,25 +45,25 @@
 
 **錄音來源**（自行到原始來源下載，不從參考站拆檔）
 
-| 用途 | 來源 | 授權 | 義務 |
-|---|---|---|---|
-| 37 個符號 | 教育部《國語注音符號手冊》真人錄音 | 政府資料開放授權條款第 1 版 | 標示出處 |
-| 單音節（四聲真人念） | audio-cmn（錄音者 Chen Wang） | CC BY-SA 3.0 | 標示出處＋相同方式分享 |
-| 單音節（備援） | davinfifield/mp3-chinese-pinyin-sound | 公眾領域 | — |
-| 詞語、句子 | 裝置內建 TTS | — | — |
+| 用途 | 來源 | 授權（已查證 2026-10-14） | 義務 | 狀態 |
+|---|---|---|---|---|
+| 37 個符號 | 教育部《國語注音符號手冊》數位版開放部件（[首頁](https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html) `bopomofo_materials_20170213.zip`） | **CC BY 4.0**（壓縮檔 `license.txt`；另載明視為符合政府資料開放授權條款） | 標示「2017 © 教育部，國語注音符號手冊-開放部件」＋授權連結 | ☑ 已上線 |
+| 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ☐ 待確認授權版本、試聽口音 |
+| 單音節（備援） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ☐ 待試聽 |
+| 詞語、句子 | 裝置內建 TTS | — | — | ☑ |
 
-- 兩套單音節錄音逐一試聽，挑較準的；統一處理：去頭尾空白、去雜音（嗡嗡聲）、音量正規化。處理腳本放 `tools/`。
-- 上線前逐一確認授權條款原文，並在家長設定頁加「聲音從哪裡來」說明＋出處。
+- 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
+- 單音節錄音（P2 抓錯遊戲、拼拼看才需要）：兩套逐一試聽，挑較準且**接近台灣口音**的；audio-cmn 需先確認 CC BY-SA 版本，SA 只約束錄音檔本身的改作。
 
 **檔案**
-- `assets/audio/zh/sym/<符號>.mp3`（37 檔）
+- `assets/audio/zh/sym/<碼位>.mp3`（37 檔，例 ㄅ = `3105.mp3`；用碼位避免伺服器處理非 ASCII 檔名）
 - `assets/audio/zh/syl/<注音含聲調>.mp3`（例 `ㄇㄠ.mp3`、`ㄇㄚˇ.mp3`；一聲不加符號）
 - 不內嵌 base64（參考站整站 700KB 都是音檔），改成按需載入＋快取。
 
 **播放規格**
-- 統一入口 `speakSeq([...])`：依序播放 `{k: 錄音 key}`／`{t: TTS 文字}`／`{wait: ms}`；錄音缺檔時退回該項的 `t`。新的序列開始會取消舊序列（token），`hush()` 一併中止錄音與 TTS。
-- 錄音優先用 `<audio>` 元素播放（不受 iPhone／iPad 靜音開關影響），失敗才改 Web Audio。
-- iOS 音訊解鎖：在 `touchend`／`pointerup`／`click`／`keydown` 時 resume AudioContext。
+- ☑ 統一入口 `seq([...])`：依序執行 `{t, pitch, rate}`（TTS）／數字（停頓 ms）／函式（如 `() => saySym(s)`）。新的序列開始會取消舊序列（token），`hush()` 一併中止錄音與 TTS。
+- ☑ `saySym()`：錄音用單一 `<audio>` 元素播放（不受 iPhone／iPad 靜音開關影響），失敗才用 TTS 念代表字。
+- ☑ iOS 解鎖：第一次 `touchend`／`click` 時以靜音播放一次預熱 `<audio>`。（尚未在實機 iPhone 驗證）
 - `visibilitychange` 切到背景時 `hush()`。
 - 雙字詞若兩個音節都有錄音，可串接播放（音節間 ~80ms）；否則用 TTS。輕聲（˙）一律用 TTS。
 - 家長設定頁顯示「錄音／語音合成」目前用哪一種。
