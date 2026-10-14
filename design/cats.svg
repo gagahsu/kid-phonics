@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 360" width="1080" height="720">
-  <title>胖胖＆菲菲 造型草稿 v2</title>
+  <title>胖胖＆菲菲 造型草稿 v3</title>
   <defs>
     <style>
       .ol{stroke:#3d3330;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
@@ -25,9 +25,9 @@
   <!-- ============ 胖胖（米克斯：白底＋深棕虎斑，麒麟尾） ============ -->
   <g id="pangpang">
     <!-- 麒麟尾: short, kinked, hooked tip -->
-    <path d="M206 258 Q232 262 240 246 L252 238 Q262 232 256 222" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M206 258 Q232 262 240 246 L252 238 Q262 232 256 222" fill="none" stroke="#8a6c56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M226 252 l2 9 M240 244 l7 6 M252 228 l8 2" class="st" stroke-width="2.2"/>
+    <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#8a6c56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M222 252 l4 7" class="st" stroke-width="2.2"/>
     <!-- body -->
     <ellipse cx="140" cy="222" rx="80" ry="62" fill="#FBF8F3" class="ol"/>
     <g clip-path="url(#pBody)">
@@ -73,19 +73,20 @@
     <path d="M100 152 L66 146 M100 158 L66 162 M180 152 L214 146 M180 158 L214 162" class="wh"/>
   </g>
 
-  <!-- ============ 菲菲（俄羅斯藍貓：苗條、窩在白色籃子裡） ============ -->
+  <!-- ============ 菲菲（俄羅斯藍貓：全身藍灰、苗條、坐姿同胖胖） ============ -->
   <g id="feifei">
-    <!-- basket back rim -->
-    <path d="M300 214 Q300 196 318 196 H504 Q522 196 522 214" fill="#E6E4DE" class="ol"/>
-    <!-- slim back, curled up inside -->
-    <ellipse cx="378" cy="214" rx="70" ry="26" fill="url(#fShade)" class="ol"/>
-    <!-- basket front -->
-    <path d="M294 212 H528 L518 290 Q516 302 502 302 H320 Q306 302 304 290Z" fill="#F7F6F2" class="ol"/>
-    <path d="M294 212 H528" class="ln" stroke-width="7" stroke="#3d3330"/>
-    <path d="M294 212 H528" class="ln" stroke-width="3" stroke="#ffffff"/>
-    <path d="M322 236 H500" class="ln" stroke-width="1.6" opacity=".25"/>
-    <!-- head, chin resting on the rim -->
-    <g transform="translate(120 28) scale(.85)">
+    <!-- long tail wrapped around the front -->
+    <path d="M452 250 Q490 262 474 286 Q460 300 420 294" fill="none" stroke="#3d3330" stroke-width="20" stroke-linecap="round"/>
+    <path d="M452 250 Q490 262 474 286 Q460 300 420 294" fill="none" stroke="#838c98" stroke-width="14" stroke-linecap="round"/>
+    <!-- slim body -->
+    <ellipse cx="400" cy="224" rx="64" ry="60" fill="url(#fShade)" class="ol"/>
+    <ellipse cx="400" cy="214" rx="26" ry="30" fill="#a9b1bb" opacity=".35"/>
+    <!-- front paws -->
+    <ellipse cx="383" cy="279" rx="15" ry="10" fill="#8d96a2" class="ol"/>
+    <ellipse cx="417" cy="279" rx="15" ry="10" fill="#8d96a2" class="ol"/>
+    <path d="M379 275v7M388 275v7M413 275v7M422 275v7" class="ln" stroke-width="1.8"/>
+    <!-- head (same art as before, centered over the body) -->
+    <g transform="translate(18 -22)">
       <path d="M330 130 L322 70 Q324 64 330 67 L372 104Z" fill="#848d99" class="ol"/>
       <path d="M336 120 L331 82 L360 106Z" fill="#C9AEB4"/>
       <path d="M434 130 L442 70 Q440 64 434 67 L392 104Z" fill="#848d99" class="ol"/>
@@ -110,7 +111,7 @@
   </g>
 
   <text class="name" x="140" y="324">胖胖</text>
-  <text class="name" x="410" y="330">菲菲</text>
+  <text class="name" x="400" y="324">菲菲</text>
   <text class="zy" x="140" y="348">ㄆㄤˋ ㄆㄤˋ</text>
-  <text class="zy" x="410" y="352">ㄈㄟ ㄈㄟ</text>
+  <text class="zy" x="400" y="348">ㄈㄟ ㄈㄟ</text>
 </svg>
