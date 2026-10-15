@@ -410,6 +410,36 @@ img { display: block; max-width: 100%; }
 .tile.used { visibility: hidden; }
 .tile:disabled:not(.used) { opacity: .35; }
 
+/* 泡泡: bubbles rest at 30% height (what reduced motion shows); `rise` starts them below and ends above */
+.play.small { width: 52px; height: 52px; font-size: 24px; flex: none; box-shadow: 0 3px 0 #E0A600; }
+.bub-stage {
+  --h: min(56vh, 440px); position: relative; height: var(--h); overflow: hidden; border-radius: 28px;
+  background: linear-gradient(#DDF2FF, #F2FAFF 70%, #E3F6EA); box-shadow: inset 0 0 0 3px #fff, var(--shadow);
+}
+.bub {
+  /* 4 lanes, one per quarter; the size leaves room for the sway at the edges */
+  --s: min(92px, calc((100% - 60px) / 4));
+  position: absolute; bottom: 30%; left: calc(var(--lane) * 25% + 12.5% - var(--s) / 2); width: var(--s); aspect-ratio: 1; padding: 0;
+  border: 0; background: none; touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  animation: rise var(--rise) linear var(--delay) both;
+  --from: calc(var(--h) * .3 + 96px); --to: calc(var(--h) * -.7 - 6px);
+}
+.bub span {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;
+  font-family: var(--kai); font-size: clamp(36px, 10vw, 46px); font-weight: 700; color: var(--ink);
+  background: radial-gradient(circle at 32% 28%, #fff 0 12%, rgba(255,255,255,.55) 13% 30%, rgba(190,228,255,.55) 60%, rgba(120,190,245,.6));
+  border: 3px solid rgba(255,255,255,.9); box-shadow: inset -6px -8px 14px rgba(63,169,245,.25), 0 4px 10px rgba(31,42,68,.08);
+}
+.bub.popped { pointer-events: none; }
+.bub.popped span { animation: popout .3s ease forwards; }
+.bub.glow span { box-shadow: 0 0 0 5px var(--yellow), 0 0 18px 6px rgba(255,201,60,.7); }
+@keyframes rise {
+  from { transform: translate(0, var(--from)); }
+  50% { transform: translate(calc(var(--sway) * 6px), calc((var(--from) + var(--to)) / 2)); }
+  to { transform: translate(0, var(--to)); }
+}
+@keyframes popout { 40% { transform: scale(1.35); opacity: .8; } to { transform: scale(1.6); opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

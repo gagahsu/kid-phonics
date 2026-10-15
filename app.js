@@ -26,6 +26,7 @@ const STORE = 'kidphonics.v1';
 const S = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })();
 S.settings ??= { rate: 0.8, voice: '' };
 S.settings.narrate ??= true;           // cats read instructions / praise aloud
+S.settings.bubbles ??= 'slow';         // 泡泡 rising speed: slow | mid | fast
 S.stats ??= {};                        // 'zh:ㄅ' -> {ok, bad, streak}
 S.seen ??= {};                         // 'zh:ㄅ' -> first time its page was opened (ms)
 S.stickers ??= {};                     // picture slug -> unlocked at (ms); never taken back
@@ -306,7 +307,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -330,7 +331,8 @@ function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const today = S.days[dayKey()];
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
-  const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned);
+  const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned),
+    bubLeft = Math.max(0, BUB_MIN - learned);
   const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
@@ -368,6 +370,9 @@ function home() {
       ${spellLeft
         ? `<a href="#/spell" class="locked" data-act="lockSpell"><span class="ico">🔒</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">再學會 ${spellLeft} 個符號（★），就能玩</span></span>${SOFT}</a>`
         : `<a href="#/spell"><span class="ico">🛝</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">注音溜滑梯，拼出一個字</span></span>${SOFT}</a>`}
+      ${bubLeft
+        ? `<a href="#/bubbles" class="locked" data-act="lockBub"><span class="ico">🔒</span><span class="mt"><span class="t">泡泡</span><br><span class="s">再學會 ${bubLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
+        : `<a href="#/bubbles"><span class="ico">🫧</span><span class="mt"><span class="t">泡泡</span><br><span class="s">聽聲音，戳破對的泡泡，複習學會的符號</span></span>${QUIET}</a>`}
     </nav>
     ${calendar()}
     <div class="progress">
@@ -393,6 +398,7 @@ function home() {
   // the number is on screen; spoken lines stay fixed so they can be recorded
   ACT.lockMem = () => seq([{ t: '再多認識幾個符號，就能玩翻牌喔。', ...FEI }]);
   ACT.lockSpell = () => seq([{ t: '再多學會幾個符號，就能玩拼拼看喔。', ...FEI }]);
+  ACT.lockBub = () => seq([{ t: '再多學會幾個符號，就能玩泡泡喔。', ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -1058,6 +1064,95 @@ function spellPlace(q, s, slide) {
   }
 }
 
+/* ============ game: 泡泡 (pop the bubble with the sound you hear) ============ */
+// Review of learned symbols only: 菲菲 plays a symbol, 4 bubbles rise (it + 3 near-misses).
+// A bubble that floats off the top is a miss: the sound plays again and a new wave starts.
+const BUB_MIN = 5;      // learned symbols before it unlocks
+const BUB_N = 8;
+const BUB_SPEED = { slow: { name: '慢', sec: 11 }, mid: { name: '中', sec: 8 }, fast: { name: '快', sec: 6 } };
+
+function bubbleGame() {
+  const learned = Z.symbols.filter(x => level(x.s) === 3).map(x => x.s);
+  if (learned.length < BUB_MIN) return go('');
+  // weakest first; with few learned symbols a symbol may come back, but not twice in a row
+  const pool = shuffle(chooseTargets(learned, BUB_N)), ts = [];
+  while (pool.length) { const i = pool.findIndex(x => x !== ts.at(-1)); ts.push(...pool.splice(Math.max(0, i), 1)); }
+  const qs = ts.map(t => ({ t, opts: shuffle([t, ...distractors(t, 3)]) }));
+  G = { cfg: { game: 'bubbles' }, qs, k: 0, results: [], over: false, told: {}, newStickers: [] };
+  renderBubbles();
+}
+
+function renderBubbles() {
+  if (G.k >= G.qs.length) return renderDone();
+  const q = G.qs[G.k];
+  q.tries = 0; q.locked = false;
+  app.innerHTML = `
+    ${roundBar()}
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">聽聲音，戳破對的泡泡！</div>
+        <button class="play small" data-act="replay" aria-label="再聽一次">🔊</button></div>
+      <div class="bub-stage" style="--rise:${BUB_SPEED[S.settings.bubbles]?.sec || 11}s"></div>
+    </div>`;
+  ACT.quit = () => { G = null; go(''); };
+  ACT.replay = el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); seq([() => saySym(q.t)]); };
+  const intro = !G.told.b;
+  G.told.b = true;
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || location.hash !== '#/bubbles') return;
+    bubWave(q, intro ? narrate({ t: '聽聲音，戳破對的泡泡！', ...FEI }, 200) : []);
+  }, 300);
+}
+
+// one wave: say the sound, then let the bubbles go (lanes shuffled, starts staggered)
+async function bubWave(q, before = []) {
+  const g = G;
+  $('.bub-stage').innerHTML = '';
+  if (!await seq([...before, () => saySym(q.t), 150]) || G !== g || G.qs[G.k] !== q || q.locked) return;
+  const stage = $('.bub-stage');
+  const left = q.opts.filter(o => o === q.t || !q.gone?.includes(o));
+  const lanes = shuffle([0, 1, 2, 3]).slice(0, left.length), delays = shuffle([0, 0.7, 1.4, 2.1]);
+  stage.innerHTML = left.map((o, i) => `<button class="bub${q.tries >= 2 && o === q.t ? ' glow' : ''}" data-o="${o}"
+    style="--lane:${lanes[i]};--delay:${delays[i]}s;--sway:${(Math.random() * 2 - 1).toFixed(2)}" aria-label="${o}"><span>${o}</span></button>`).join('');
+  for (const b of stage.querySelectorAll('.bub')) {
+    // pointerdown, not click: a moving target can slide out from under a slow tap
+    b.addEventListener('pointerdown', e => { e.preventDefault(); bubPop(q, b); });
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bubPop(q, b); } });
+    if (b.dataset.o === q.t) b.addEventListener('animationend', e => { if (e.animationName === 'rise') bubMissed(q); });
+  }
+}
+
+function bubMissed(q) {
+  if (q.locked || G?.qs[G.k] !== q) return;
+  q.tries++;
+  bubble('泡泡飛走了，再聽一次～'); setCat('fei', 'calm', 'wobble');
+  bubWave(q, narrate({ t: '泡泡飛走了，再聽一次', ...FEI }, 150));
+}
+
+async function bubPop(q, b) {
+  if (q.locked || b.classList.contains('popped')) return;
+  if (b.dataset.o !== q.t) {
+    q.tries++; boop();
+    (q.gone ??= []).push(b.dataset.o);   // that one stays away in later waves
+    b.classList.add('popped', 'wrong');
+    bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+    if (q.tries >= 2) app.querySelector(`.bub[data-o="${q.t}"]`)?.classList.add('glow');
+    seq([300, ...narrate({ t: '再聽聽看', ...FEI }, 150), () => saySym(q.t)]);
+    return;
+  }
+  q.locked = true;
+  const firstTry = q.tries === 0;
+  G.results[G.k] = firstTry;
+  record(q.t, firstTry);
+  G.newStickers.push(...unlockStickers());
+  ding(); b.classList.add('popped');
+  app.querySelectorAll('.bub').forEach(x => x.style.animationPlayState = 'paused');
+  const praise = pick(PRAISE);
+  bubble(praise); setCat('fei', 'smile', 'hop');
+  const g = G;
+  await Promise.all([sleep(1100), seq([200, () => saySym(q.t), 150, ...narrate({ t: praise, ...FEI })])]);
+  if (G === g && G.qs[G.k] === q && location.hash === '#/bubbles') { G.k++; renderBubbles(); }
+}
+
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
   if (G.over) return;           // re-rendered by navigation: don't count the round twice
@@ -1118,6 +1213,12 @@ function settings() {
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
+      <h3>泡泡的速度</h3>
+      <div class="chips" role="group" aria-label="泡泡的速度">${Object.entries(BUB_SPEED).map(([k, v]) =>
+        `<button class="chip" data-act="bubSpeed" data-k="${k}" aria-pressed="${S.settings.bubbles === k}">${v.name}</button>`).join('')}</div>
+      <p class="note">泡泡從下面飄到上面要幾秒。孩子常常來不及戳，就調慢一點。</p>
+    </div>
+    <div class="panel">
       <h3>練習紀錄</h3>
       <p class="note">已學會 ${Z.symbols.filter(x => level(x.s) === 3).length} 個・貼紙 ${STICKERS.filter(x => S.stickers[x.art]).length} / ${STICKERS.length} 張・
         這個月練習 ${Object.keys(S.days).filter(k => k.startsWith(dayKey().slice(0, 7))).length} 天・今天 ${S.days[dayKey()]?.rounds || 0} 輪</p>
@@ -1136,6 +1237,7 @@ function settings() {
       <p class="note"><b>錄音播不出來時</b>：改用這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
+  ACT.bubSpeed = el => { S.settings.bubbles = el.dataset.k; save(); app.querySelectorAll('[data-act=bubSpeed]').forEach(b => b.setAttribute('aria-pressed', b === el)); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
   $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rateV').textContent = S.settings.rate.toFixed(1); save(); };
   ACT.test = () => seq([() => saySym('ㄅ'), 250, { t: '爸爸，杯子，包子。' }]);
