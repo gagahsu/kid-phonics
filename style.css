@@ -660,3 +660,31 @@ img { display: block; max-width: 100%; }
 .backup summary { cursor: pointer; color: var(--ink-soft); font-size: 15px; padding: 4px 0; }
 .backup[open] summary { margin-bottom: 4px; }
 .backup .warn { margin: 8px 0; }
+
+/* 錄音跟讀: 🎤 on the symbol page, the status strip, 我的聲音 */
+.say-all { gap: 10px; flex-wrap: wrap; }
+.btn.mic { background: #FFE4E4; color: #B3262B; }
+.btn.mic.recording, .mic-mini.recording { background: var(--red); color: #fff; animation: pulse 1s ease infinite; }
+.card-wrap { position: relative; }
+.card-wrap .card { width: 100%; }
+.mic-mini {
+  position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%;
+  background: #FFE4E4; box-shadow: var(--shadow); font-size: 20px; padding: 0;
+}
+.recbar {
+  position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 60; transform: translate(-50%, calc(100% + 40px));
+  min-width: 220px; max-width: calc(100% - 32px); padding: 12px 20px 14px; border-radius: 18px; overflow: hidden;
+  background: var(--ink); color: #fff; font-size: 18px; text-align: center; box-shadow: 0 8px 24px rgba(31, 42, 68, .3);
+  transition: transform .25s ease, visibility 0s .25s; visibility: hidden;
+}
+.recbar.on { transform: translate(-50%, 0); visibility: visible; transition: transform .25s ease; }
+.recbar .rec-prog { position: absolute; left: 0; bottom: 0; height: 5px; width: 100%; background: var(--red); transform-origin: 0 50%; animation: rec-prog linear forwards; }
+@keyframes rec-prog { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.vrow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--paper); border-radius: var(--r); box-shadow: var(--shadow); }
+.vrow .vsym { width: 64px; height: 64px; flex: none; display: grid; place-items: center; border-radius: 16px; font-family: var(--kai); font-size: 44px; font-weight: 700; }
+.vrow .vword { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.vrow .vword img { width: 56px; height: 56px; object-fit: contain; flex: none; }
+.vrow .vword .zw { font-size: 22px; }
+.vrow .vbtns { display: flex; gap: 6px; margin-left: auto; flex: none; }
+.vrow .vbtns .btn { padding: 0 12px; min-height: 48px; }
+#vcount .btn { margin-left: 6px; min-height: 36px; padding: 0 12px; font-size: 14px; }

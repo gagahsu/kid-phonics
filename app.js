@@ -34,7 +34,8 @@ S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp
 S.spell ??= {};                        // 'zh:貓' -> {ok, round}: 拼拼看 first-try spellings, one per round
 S.map ??= {};                          // 'zh:ㄅㄆ' -> 闖關地圖: that pair first beaten in a 大對決 at (ms)
 S.settings.learnView ??= 'map';
-S.settings.kidName ??= '';             // printed on 獎狀        // 認識符號: 'map' (闖關地圖) | 'grid'
+S.settings.kidName ??= '';             // printed on 獎狀
+S.settings.mic ??= '';                 // '' (not asked yet) | 'ok' | 'denied' — denied hides the 🎤 buttons        // 認識符號: 'map' (闖關地圖) | 'grid'
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
 const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
 function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
@@ -325,10 +326,11 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, teach: teachGame, award, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, teach: teachGame, award, myvoice, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
+  recBar('');
   const [r = '', arg] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   (routes[r] || home)(arg);
   window.scrollTo(0, 0);
@@ -378,6 +380,7 @@ function home() {
       <a href="#/practice"><span class="ico">👂</span><span class="mt"><span class="t">聽音練習</span><br><span class="s">${seenSyms().length
         ? `練習學過的 ${seenSyms().length} 個符號，一輪 ${ROUND} 題` : '先學幾個符號，再來練習'}</span></span>${QUIET}</a>
       <a href="#/stickers"><span class="ico">🎁</span><span class="mt"><span class="t">我的貼紙簿</span><br><span class="s">已收集 ${got} / ${STICKERS.length} 張</span></span></a>
+      ${micOK() ? `<a href="#/myvoice"><span class="ico">🎙️</span><span class="mt"><span class="t">我的聲音</span><br><span class="s">聽聽自己念的注音和詞</span></span></a>` : ''}
     </nav>
     <h3 class="group-h">遊戲</h3>
     <nav class="menu games">
@@ -610,12 +613,15 @@ function symPage(s) {
       <button class="big-sym g-${x.g}" data-act="saySym" aria-label="聽 ${s} 的聲音">${s}<span class="spk">🔊</span></button>
       <a class="icon-btn nav-btn" href="#/sym/${next}" aria-label="下一個 ${next}">›</a>
     </div>
-    <div class="say-all"><button class="btn" data-act="sayAll">▶ 全部聽一次</button></div>
-    <div class="words">${x.words.map(w => `<button class="card" data-act="sayWord" data-w="${esc(w)}">${img(w)}${ruby(w, s)}</button>`).join('')}</div>
+    <div class="say-all"><button class="btn" data-act="sayAll">▶ 全部聽一次</button>${micOK()
+      ? `<button class="btn mic" data-act="rec" data-k="sym:${s}">🎤 我也說說看</button>` : ''}</div>
+    <div class="words">${x.words.map(w => `<div class="card-wrap"><button class="card" data-act="sayWord" data-w="${esc(w)}">${img(w)}${ruby(w, s)}</button>${micOK()
+      ? `<button class="mic-mini" data-act="rec" data-k="word:${esc(w)}" aria-label="我也說說看：${esc(w)}">🎤</button>` : ''}</div>`).join('')}</div>
     <div class="btn-row"><a class="btn primary big" href="#/practice/${s}">練習 ${s} 👂</a></div>`;
   markSeen(s);
   ACT.saySym = async el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); playToken++; await saySym(s); };
   ACT.sayWord = async el => { playToken++; flash(el); await sayWord(el.dataset.w); };
+  ACT.rec = el => { playToken++; sayAfterMe(el); };
   ACT.sayAll = async () => {
     const my = ++playToken;
     const big = $('.big-sym'); big.classList.add('playing');
@@ -628,6 +634,135 @@ function symPage(s) {
   };
   setTimeout(() => saySym(s), 250);
 }
+/* ============ 錄音跟讀: 🎤 我也說說看, and 我的聲音 ============ */
+// Record 3 s on the device, then play the example and the child's own try back to back. No scoring
+// (speech recognition on 5-year-olds is too unreliable). Only the latest take per symbol / word is kept,
+// in IndexedDB on this device; nothing is uploaded. Keys: 'zh:sym:ㄅ', 'zh:word:貓'.
+const REC_MS = 3000;
+const CAN_REC = !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && window.isSecureContext && window.indexedDB);
+const micOK = () => CAN_REC && S.settings.mic !== 'denied';
+let vdb;
+const voiceDB = () => vdb ??= new Promise((res, rej) => {
+  const q = indexedDB.open('kidphonics-voice', 1);
+  q.onupgradeneeded = () => q.result.createObjectStore('clips');
+  q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+});
+async function voiceStore(mode, fn) {
+  const db = await voiceDB();
+  return new Promise((res, rej) => {
+    const t = db.transaction('clips', mode), q = fn(t.objectStore('clips'));
+    t.oncomplete = () => res(q?.result); t.onerror = () => rej(t.error);
+  });
+}
+const voicePut = (k, v) => voiceStore('readwrite', st => st.put(v, k));
+const voiceAll = async () => { try { return await voiceStore('readonly', st => st.getAll()); } catch { return []; } };
+const voiceClear = () => voiceStore('readwrite', st => st.clear());
+// k = 'sym:ㄅ' | 'word:貓'
+const voiceExample = k => k.startsWith('sym:') ? saySym(k.slice(4)) : sayWord(k.slice(5));
+async function playBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  try { await playClip(url); } finally { URL.revokeObjectURL(url); }
+}
+
+// null if the microphone can't be used (denied -> S.settings.mic, and the 🎤 buttons disappear)
+async function recordClip(onStart) {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) {
+    if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { S.settings.mic = 'denied'; save(); }
+    return null;
+  }
+  if (S.settings.mic !== 'ok') { S.settings.mic = 'ok'; save(); }
+  const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported?.(t));
+  const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined), chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { rec.onstop = res; });
+  rec.start();
+  onStart?.();
+  await sleep(REC_MS);
+  rec.stop();
+  await stopped;
+  stream.getTracks().forEach(t => t.stop());   // let go of the mic: iOS plays back quietly while it is held
+  return new Blob(chunks, { type: rec.mimeType || type || 'audio/webm' });
+}
+
+// a strip at the bottom of the screen says what's happening: 🔴 recording (with a 3 s bar), then playback
+function recBar(html, ms = 0) {
+  let bar = $('#recbar');
+  if (!bar) {
+    if (!html) return;
+    document.body.insertAdjacentHTML('beforeend', '<div id="recbar" class="recbar" role="status"></div>');
+    bar = $('#recbar');
+  }
+  bar.innerHTML = html + (ms ? `<i class="rec-prog" style="animation-duration:${ms}ms"></i>` : '');
+  bar.classList.toggle('on', !!html);
+}
+let recBusy = false;
+async function sayAfterMe(el) {
+  if (recBusy) return;
+  recBusy = true;
+  const k = el.dataset.k, page = location.hash;
+  const here = () => location.hash === page;
+  el.classList.add('recording');
+  try {
+    await seq(narrate({ t: '換你說說看！', ...FEI }, 150));
+    if (!here()) return;
+    tone([880], 0.12);   // the beep = start talking
+    await sleep(200);
+    const blob = await recordClip(() => recBar('<b>🔴 說說看…</b>', REC_MS));
+    if (!blob) {
+      recBar(here() ? '<b>🎤 不能錄音</b>：請家長到「家長設定」看看怎麼打開麥克風' : '');
+      if (here()) symPage(decodeURIComponent(page.split('/')[2]));   // the 🎤 buttons are gone now
+      return;
+    }
+    await voicePut('zh:' + k, { k, blob, at: Date.now() });
+    if (!here()) return recBar('');
+    recBar('<b>👂 範例</b>');
+    await seq([() => voiceExample(k), 300, ...narrate({ t: '這是你的聲音', ...FEI }, 150)]);
+    if (!here()) return recBar('');
+    recBar('<b>🙂 你的聲音</b>');
+    await playBlob(blob);
+    recBar('');
+  } catch (e) {
+    console.warn('recording failed', e);
+    recBar('');
+  } finally {
+    recBusy = false;
+    el.classList.remove('recording');
+  }
+}
+
+// #/myvoice: every saved take, symbols first (standard order), then words; example and own voice side by side
+async function myvoice() {
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的聲音</h2></div>`;
+  const all = await voiceAll();
+  if (location.hash !== '#/myvoice') return;
+  const order = Z.symbols.map(x => x.s), words = Object.keys(Z.words);
+  const syms = all.filter(v => v.k.startsWith('sym:') && SYM[v.k.slice(4)])
+    .sort((a, b) => order.indexOf(a.k.slice(4)) - order.indexOf(b.k.slice(4)));
+  const ws = all.filter(v => v.k.startsWith('word:') && Z.words[v.k.slice(5)])
+    .sort((a, b) => words.indexOf(a.k.slice(5)) - words.indexOf(b.k.slice(5)));
+  const row = v => {
+    const isSym = v.k.startsWith('sym:'), it = v.k.slice(isSym ? 4 : 5);
+    return `<div class="vrow">
+      ${isSym ? `<span class="vsym g-${SYM[it].g}">${it}</span>` : `<span class="vword">${img(it)}${ruby(it)}</span>`}
+      <span class="vbtns"><button class="btn" data-act="vEx" data-k="${esc(v.k)}">👂 範例</button>
+      <button class="btn primary" data-act="vMine" data-k="${esc(v.k)}">🙂 我的</button></span>
+    </div>`;
+  };
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的聲音</h2></div>
+    ${syms.length || ws.length
+      ? `${syms.length ? `<h3 class="group-h">注音符號<small>${syms.length} 個</small></h3>${syms.map(row).join('')}` : ''}
+        ${ws.length ? `<h3 class="group-h">詞<small>${ws.length} 個</small></h3>${ws.map(row).join('')}` : ''}
+        <p class="note">每個符號和詞只留最新的一次錄音。錄音只存在這台裝置，不會上傳。</p>`
+      : `<p class="note empty-v">還沒有錄音。到「認識符號」打開一個注音符號，按「🎤 我也說說看」。</p>
+        <div class="btn-row"><a class="btn primary big" href="#/learn">去認識符號 👀</a></div>`}`;
+  const byK = Object.fromEntries(all.map(v => [v.k, v]));
+  ACT.vEx = el => seq([() => voiceExample(byK[el.dataset.k].k)]);
+  ACT.vMine = el => { hush(); playBlob(byK[el.dataset.k].blob); };
+}
+
 function flash(el) {
   app.querySelectorAll('.speaking').forEach(c => c.classList.remove('speaking'));
   void el.offsetWidth; el.classList.add('speaking');
@@ -1770,6 +1905,16 @@ function settings() {
       </details>
     </div>
     <div class="panel">
+      <h3>錄音跟讀（🎤 我也說說看）</h3>
+      ${!CAN_REC ? `<p class="note">這個瀏覽器不能錄音，或網址不是 https，所以「🎤 我也說說看」和「我的聲音」不會出現。</p>`
+        : S.settings.mic === 'denied' ? `<div class="warn">麥克風權限被拒絕了，所以 🎤 按鈕先藏起來。要打開：在瀏覽器網址列左邊的 🔒（或網站設定）把「麥克風」改成允許，再按下面的按鈕。</div>
+          <div class="btn-row"><button class="btn" data-act="micRetry">🎤 重新顯示錄音按鈕</button></div>`
+        : `<p class="note">在注音符號的頁面按「🎤 我也說說看」（詞卡右上角也有 🎤），會錄 3 秒，接著播「範例 → 孩子的聲音」讓孩子自己比比看。
+            第一次會問麥克風權限。不會自動打分數。</p>`}
+      <p class="note" id="vcount"></p>
+      <p class="note">錄音只存在這台裝置的瀏覽器，不會上傳。每個符號和詞只留最新的一次。</p>
+    </div>
+    <div class="panel">
       <h3>泡泡、大對決的速度</h3>
       <div class="chips" role="group" aria-label="泡泡的速度">${Object.entries(BUB_SPEED).map(([k, v]) =>
         `<button class="chip" data-act="bubSpeed" data-k="${k}" aria-pressed="${S.settings.bubbles === k}">${v.name}</button>`).join('')}</div>
@@ -1802,6 +1947,13 @@ function settings() {
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#kidName').oninput = e => { S.settings.kidName = e.target.value.trim(); save(); };
+  ACT.micRetry = () => { S.settings.mic = ''; save(); settings(); };
+  ACT.voiceClear = async () => { if (confirm('確定要刪除所有錄音嗎？')) { await voiceClear(); settings(); } };
+  if (CAN_REC) voiceAll().then(all => {
+    const el = $('#vcount');
+    if (el) el.innerHTML = all.length ? `已經有 <b>${all.length}</b> 個錄音（<a href="#/myvoice">我的聲音</a>）。
+      <button class="btn" data-act="voiceClear">刪除所有錄音</button>` : '還沒有錄音。';
+  });
   ACT.bubSpeed = el => { S.settings.bubbles = el.dataset.k; save(); app.querySelectorAll('[data-act=bubSpeed]').forEach(b => b.setAttribute('aria-pressed', b === el)); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
   $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rateV').textContent = S.settings.rate.toFixed(1); save(); };
