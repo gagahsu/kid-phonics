@@ -346,6 +346,27 @@ img { display: block; max-width: 100%; }
   border: 0; background: var(--paper); box-shadow: var(--shadow); font-size: 18px;
 }
 
+/* 翻牌配對 */
+.mem { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: 520px; margin: 8px auto 0; }
+.mcard { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: none; perspective: 600px; }
+.mcard .back, .mcard .face {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 18px;
+  box-shadow: var(--shadow); backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  transition: transform .35s ease;
+}
+.mcard .back {
+  font-size: 30px; background: repeating-linear-gradient(45deg, #FFC93C 0 10px, #FFD460 10px 20px);
+  border: 4px solid #fff;
+}
+.mcard .face { transform: rotateY(180deg); padding: 6px; border: 4px solid transparent; }
+.mcard .face:not(.sym) { background: var(--paper); }
+.mcard .face img { width: 100%; height: 100%; object-fit: contain; }
+.mcard .face.sym { font-family: var(--kai); font-size: clamp(36px, 11vw, 64px); font-weight: 700; }
+.mcard.open .back { transform: rotateY(-180deg); }
+.mcard.open .face { transform: rotateY(0); }
+.mcard.done { cursor: default; }
+.mcard.done .face { border-color: var(--green); animation: pop .35s ease; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

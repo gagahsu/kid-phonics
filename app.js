@@ -295,7 +295,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -318,6 +318,7 @@ function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const today = S.days[dayKey()];
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
+  const memLeft = Math.max(0, MEM_MIN - seenSyms().length);
   const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
@@ -349,6 +350,9 @@ function home() {
       ${sortPairs().length
         ? `<a href="#/sort"><span class="ico">🧺</span><span class="mt"><span class="t">分類籃</span><br><span class="s">把圖片放進對的籃子，分清楚很像的音</span></span>${QUIET}</a>`
         : `<a href="#/sort" class="locked" data-act="lockSort"><span class="ico">🔒</span><span class="mt"><span class="t">分類籃</span><br><span class="s">先認識 ${sortHint().join(' 和 ')}，就能玩</span></span>${QUIET}</a>`}
+      ${memLeft
+        ? `<a href="#/memory" class="locked" data-act="lockMem"><span class="ico">🔒</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">再認識 ${memLeft} 個符號，就能玩</span></span>${QUIET}</a>`
+        : `<a href="#/memory"><span class="ico">🃏</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">翻開牌，找出符號和它的圖片</span></span>${QUIET}</a>`}
     </nav>
     ${calendar()}
     <div class="progress">
@@ -371,6 +375,7 @@ function home() {
     const [a, b] = sortHint();
     seq([{ t: '先認識', ...FEI }, () => saySym(a), { t: '和', ...FEI }, () => saySym(b), { t: '，就能玩分類籃喔。', ...FEI }]);
   };
+  ACT.lockMem = () => seq([{ t: `再認識${memLeft}個符號，就能玩翻牌喔。`, ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -754,12 +759,97 @@ async function sortDrop(q, s) {
   if (G === g && G.qs[G.k] === q && location.hash === '#/sort') { G.k++; renderSort(); }
 }
 
+/* ============ game: 翻牌配對 (match each symbol card with a picture of one of its words) ============ */
+// Review only: never calls record(). Matching is mostly remembering where a card was (and luck),
+// so a miss doesn't mean the child doesn't know the symbol — counting it would skew weight()
+// and sticker unlocks. The round still counts toward today's stamp.
+const MEM_N = 6;              // 6 pairs = 12 cards, 4 × 3
+const MEM_MIN = 6;            // symbols seen before the game unlocks
+const memStars = tries => tries <= 9 ? 3 : tries <= 13 ? 2 : 1;   // tries = pairs of cards turned
+
+function memoryGame() {
+  if (seenSyms().length < MEM_MIN) return go('');
+  // weaker symbols first; a picture may only contain its own symbol among the chosen ones,
+  // otherwise 爸爸 could match both ㄅ and ㄚ
+  const W = Z.words;
+  const fill = (chosen, order) => {
+    for (const s of order) {
+      if (chosen.length >= MEM_N) break;
+      if (chosen.some(c => c.t === s || W[c.w].zy.includes(s))) continue;
+      const ok = SYM[s].words.filter(w => !chosen.some(c => W[w].zy.includes(c.t) || W[w].art === W[c.w].art));
+      if (ok.length) chosen.push({ t: s, w: pick(ok) });
+    }
+    return chosen;
+  };
+  // weight() is random, so retrying finds another order; unseen symbols only fill in when the seen
+  // ones can't make 6 pairs (e.g. exactly 6 seen and two of them share every word, like ㄅ / ㄚ)
+  let chosen = [];
+  for (let k = 0; k < 40 && chosen.length < MEM_N; k++) {
+    const c = fill([], chooseTargets(seenSyms(), seenSyms().length));
+    if (c.length > chosen.length) chosen = c;
+  }
+  fill(chosen, shuffle(Z.symbols.map(x => x.s)));
+  const cards = shuffle(chosen.flatMap((c, i) => [{ pair: i, s: c.t }, { pair: i, w: c.w }]));
+  G = { cfg: { game: 'memory' }, qs: chosen, cards, up: [], tries: 0, found: 0, busy: false, over: false, newStickers: [] };
+  renderMemory();
+}
+
+function renderMemory() {
+  app.innerHTML = `
+    <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a><span style="flex:1"></span></div>
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">找出符號和它的圖片！</div></div>
+      <div class="mem">${G.cards.map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" aria-label="第 ${i + 1} 張牌">
+        <span class="back">🐾</span>
+        <span class="face${c.s ? ` sym g-${SYM[c.s].g}` : ''}">${c.s || img(c.w)}</span></button>`).join('')}</div>
+    </div>`;
+  ACT.flip = el => memFlip(+el.dataset.i, el);
+  ACT.quit = () => { G = null; go(''); };
+  setTimeout(() => {
+    if (G?.cfg.game !== 'memory' || G.tries || G.up.length || location.hash !== '#/memory') return;
+    seq(narrate({ t: '翻開兩張牌，找出符號和它的圖片！', ...FEI }));
+  }, 300);
+}
+
+const cardSound = c => () => c.s ? saySym(c.s) : sayWord(c.w);
+async function memFlip(i, el) {
+  const c = G.cards[i];
+  if (G.busy || c.done || G.up.includes(i)) return;
+  el.classList.add('open');
+  el.setAttribute('aria-label', c.s || c.w);
+  G.up.push(i);
+  if (G.up.length === 1) return seq([cardSound(c)]);
+  G.busy = true; G.tries++;
+  const [a, b] = G.up.map(k => G.cards[k]);
+  const els = G.up.map(k => app.querySelector(`.mcard[data-i="${k}"]`));
+  const g = G;
+  if (a.pair === b.pair) {
+    a.done = b.done = true; G.up = []; G.found++;
+    els.forEach(e => e.classList.add('done'));
+    const { t, w } = G.qs[a.pair];
+    const how = firstSyl(w).replace('˙', '')[0] === t ? '開頭是' : '裡面有';
+    ding(); bubble(`對了，「${w}」${how} ${t}`); setCat('fei', 'smile', 'hop');
+    G.busy = false;   // flipping on cuts this short, which is fine
+    await seq([...(c.s ? [cardSound(c), 250] : []), () => sayWord(w), 150, ...narrate({ t: how, ...FEI }), () => saySym(t), 300]);
+    if (G === g && G.found === G.qs.length && location.hash === '#/memory') renderDone();
+    return;
+  }
+  // not a pair: let the child hear the second card, then turn both back
+  await Promise.all([sleep(1100), seq([cardSound(c)])]);
+  if (G !== g) return;
+  els.forEach(e => { e.classList.remove('open'); e.setAttribute('aria-label', '第 ' + (+e.dataset.i + 1) + ' 張牌'); });
+  G.up = []; G.busy = false;
+}
+
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
   if (G.over) return;           // re-rendered by navigation: don't count the round twice
   G.over = true;
-  const stars = G.results.filter(Boolean).length;
-  const msg = stars === G.qs.length ? '全部答對！' : stars >= 3 ? '很棒喔！' : '多聽幾次就會了！';
+  // 翻牌 has no per-question results: its 3 stars come from how many tries it took
+  const marks = G.cfg.game === 'memory' ? [1, 2, 3].map(n => n <= memStars(G.tries)) : G.results;
+  const stars = marks.filter(Boolean).length;
+  const msg = G.cfg.game === 'memory' ? (stars === 3 ? '記得好清楚！' : '全部找到了！')
+    : stars === G.qs.length ? '全部答對！' : stars >= 3 ? '很棒喔！' : '多聽幾次就會了！';
   const day = (S.days[dayKey()] ??= { rounds: 0, stamp: '' });
   day.rounds++;
   const firstToday = !day.stamp;
@@ -771,8 +861,8 @@ function renderDone() {
     <div class="done">
       <div class="duo small">${catEl('pang', 'happy', 'dance')}${catEl('fei', tired ? 'yawn' : 'smile')}</div>
       <h2>${msg}</h2>
-      <div class="stars" aria-label="${stars} 顆星">${G.results.map((r, i) => `<span class="${r ? 'on' : 'off'}" style="animation-delay:${i * 0.15}s">★</span>`).join('')}</div>
-      <div class="recap">${G.qs.map((q, i) => `<span class="g-${SYM[q.t].g} ${G.results[i] ? 'ok' : 'no'}">${q.t}</span>`).join('')}</div>
+      <div class="stars" aria-label="${stars} 顆星">${marks.map((r, i) => `<span class="${r ? 'on' : 'off'}" style="animation-delay:${i * 0.15}s">★</span>`).join('')}</div>
+      <div class="recap">${G.qs.map((q, i) => `<span class="g-${SYM[q.t].g} ${G.cfg.game === 'memory' || G.results[i] ? 'ok' : 'no'}">${q.t}</span>`).join('')}</div>
       ${firstToday ? `<div class="stamp-new"><span class="stamp">${day.stamp}</span><span>今天的章蓋好了！</span></div>` : ''}
       ${fresh.length ? `<div class="new-stk"><p>拿到新貼紙！</p><div>${fresh.map((w, i) => `<span style="animation-delay:${0.6 + i * 0.12}s">${img(w)}</span>`).join('')}</div></div>` : ''}
       ${tired ? `<p class="rest">今天已經玩了 ${day.rounds} 輪，好厲害！<br>菲菲想睡覺了，我們明天再玩吧。</p>` : ''}
@@ -782,7 +872,7 @@ function renderDone() {
         <a class="btn ${tired ? 'primary ' : ''}big" href="#/">回首頁</a>
       </div>
     </div>`;
-  ACT.again = () => G.cfg.game === 'sort' ? sortGame() : startRound(G.cfg);
+  ACT.again = () => G.cfg.game === 'sort' ? sortGame() : G.cfg.game === 'memory' ? memoryGame() : startRound(G.cfg);
   if (stars >= 3) setTimeout(() => tone([523, 659, 784, 1047], 0.16), 200);
   seq([700, ...narrate(
     { t: '耶！', ...PANG }, { t: msg, ...FEI },
