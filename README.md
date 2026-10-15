@@ -23,6 +23,7 @@ sheets/              網格原圖 sheet_NN.png + 對應名單 sheet_NN.names.txt
 work/sheet_NN/       crop.py 裁切結果（可隨時重切）
 assets/img/          審過的圖 <slug>.webp，網站實際使用
 tools/               Python 工具（用 `py` 執行，python 不在 PATH）
+syllable.js          注音音節解析 {聲母, 介音, 韻母, 聲調}；改過要跑 `node tools/test_syllable.mjs`（會檢查 zhuyin.json 每個音節）
 ```
 
 ## 圖卡製作流程

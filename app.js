@@ -1,4 +1,5 @@
 // 發音樂園 — 注音 (ABC / 50 音 later). No build step: plain ES module + data/*.json.
+import { parseSyl, sylParts, TONE_MARK } from './syllable.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $('#app');
@@ -29,6 +30,7 @@ S.stats ??= {};                        // 'zh:ㄅ' -> {ok, bad, streak}
 S.seen ??= {};                         // 'zh:ㄅ' -> first time its page was opened (ms)
 S.stickers ??= {};                     // picture slug -> unlocked at (ms); never taken back
 S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp}
+S.spell ??= {};                        // 'zh:貓' -> {ok, round}: 拼拼看 first-try spellings, one per round
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
 const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
 function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
@@ -39,14 +41,13 @@ function record(s, firstTry) {
   if (firstTry) { st.ok++; st.streak++; } else { st.bad++; st.streak = Math.max(0, st.streak - 1); }
   save();
 }
+// the one way a sticker gets into the book (learned symbol, 拼拼看); true if it's new. Caller saves.
+function giveSticker(art) { if (S.stickers[art]) return false; S.stickers[art] = Date.now(); return true; }
 // a learned symbol unlocks the pictures of its words; returns the words newly unlocked
 function unlockStickers() {
   const fresh = [];
   for (const x of Z.symbols) if (level(x.s) === 3)
-    for (const w of x.words) {
-      const a = Z.words[w].art;
-      if (!S.stickers[a]) { S.stickers[a] = Date.now(); fresh.push(w); }
-    }
+    for (const w of x.words) if (giveSticker(Z.words[w].art)) fresh.push(w);
   if (fresh.length) save();
   return fresh;
 }
@@ -295,7 +296,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -314,11 +315,12 @@ app.addEventListener('click', e => {
 
 /* ============ home ============ */
 const QUIET = '<span class="tag">🤫 不用開口</span>';
+const SOFT = '<span class="tag">🙂 小聲就好</span>';
 function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const today = S.days[dayKey()];
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
-  const memLeft = Math.max(0, MEM_MIN - seenSyms().length);
+  const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned);
   const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
@@ -353,6 +355,9 @@ function home() {
       ${memLeft
         ? `<a href="#/memory" class="locked" data-act="lockMem"><span class="ico">🔒</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">再認識 ${memLeft} 個符號，就能玩</span></span>${QUIET}</a>`
         : `<a href="#/memory"><span class="ico">🃏</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">翻開牌，找出符號和它的圖片</span></span>${QUIET}</a>`}
+      ${spellLeft
+        ? `<a href="#/spell" class="locked" data-act="lockSpell"><span class="ico">🔒</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">再學會 ${spellLeft} 個符號（★），就能玩</span></span>${SOFT}</a>`
+        : `<a href="#/spell"><span class="ico">🛝</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">注音溜滑梯，拼出一個字</span></span>${SOFT}</a>`}
     </nav>
     ${calendar()}
     <div class="progress">
@@ -376,6 +381,7 @@ function home() {
     seq([{ t: '先認識', ...FEI }, () => saySym(a), { t: '和', ...FEI }, () => saySym(b), { t: '，就能玩分類籃喔。', ...FEI }]);
   };
   ACT.lockMem = () => seq([{ t: `再認識${memLeft}個符號，就能玩翻牌喔。`, ...FEI }]);
+  ACT.lockSpell = () => seq([{ t: `再學會${spellLeft}個符號，就能玩拼拼看喔。`, ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -558,14 +564,12 @@ function renderQ() {
   if (G.k >= G.qs.length) return renderDone();
   const q = G.qs[G.k];
   q.tries = 0; q.locked = false;
-  const dotsHtml = G.qs.map((_, i) => `<i class="${i < G.k ? (G.results[i] ? 'done' : 'miss') : i === G.k ? 'now' : ''}"></i>`).join('');
   const prompt = q.type === 'A'
     ? `<div class="q-prompt"><button class="play" data-act="replay" aria-label="再聽一次">🔊</button></div>`
     // zhuyin hidden until answered — it would give the answer away
     : `<div class="q-prompt"><button class="q-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}<span id="qword" class="zw">${esc(q.w)}</span></button></div>`;
   app.innerHTML = `
-    <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a>
-      <span class="pdots" aria-label="第 ${G.k + 1} 題，共 ${G.qs.length} 題">${dotsHtml}</span><span style="width:46px"></span></div>
+    ${roundBar()}
     <div class="q">
       <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">${TITLE[q.type]}</div></div>
       ${prompt}
@@ -586,6 +590,10 @@ function renderQ() {
     seq([...(intro ? narrate({ t: TITLE[q.type], ...FEI }, 200) : []), () => promptSound(q)]);
   }, 300);
 }
+// ✕ + one dot per question: green = first try, orange = needed help, yellow = now
+const roundBar = (unit = '題') => `<div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a>
+  <span class="pdots" aria-label="第 ${G.k + 1} ${unit}，共 ${G.qs.length} ${unit}">${G.qs.map((_, i) =>
+    `<i class="${i < G.k ? (G.results[i] ? 'done' : 'miss') : i === G.k ? 'now' : ''}"></i>`).join('')}</span><span style="width:46px"></span></div>`;
 function bubble(text) { const b = $('#bubble'); if (b) b.textContent = text; }
 
 const PRAISE = ['答對了！', '好棒！', '太厲害了！', '沒錯！', '耳朵好靈！'];
@@ -660,10 +668,8 @@ function renderSort() {
   if (G.k >= G.qs.length) return renderDone();
   const q = G.qs[G.k];
   q.tries = 0; q.locked = false;
-  const dotsHtml = G.qs.map((_, i) => `<i class="${i < G.k ? (G.results[i] ? 'done' : 'miss') : i === G.k ? 'now' : ''}"></i>`).join('');
   app.innerHTML = `
-    <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a>
-      <span class="pdots" aria-label="第 ${G.k + 1} 張，共 ${G.qs.length} 張">${dotsHtml}</span><span style="width:46px"></span></div>
+    ${roundBar('張')}
     <div class="q">
       <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">放進對的籃子！</div></div>
       <div class="sort-stage"><button class="q-pic sort-card" aria-label="${esc(q.w)}，再聽一次">${img(q.w)}<span class="zw">${esc(q.w)}</span></button></div>
@@ -673,7 +679,7 @@ function renderSort() {
       <p class="note">把圖片拖進籃子，或直接點籃子。</p>
     </div>`;
   const card = $('.sort-card');
-  dragCard(card, s => sortDrop(q, s), () => seq([() => sayWord(q.w)]));
+  dragCard(card, '.basket', b => sortDrop(q, b.dataset.s), () => seq([() => sayWord(q.w)]));
   ACT.drop = el => sortDrop(q, el.dataset.s);
   ACT.baskSay = el => { const bk = el.previousElementSibling; flash(bk); seq([() => saySym(el.dataset.s)]); };
   ACT.quit = () => { G = null; go(''); };
@@ -686,11 +692,13 @@ function renderSort() {
   }, 300);
 }
 
-// Pointer Events cover mouse, touch and pen; a tap without moving replays the word instead
-const basketAt = ev => document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest('.basket')).find(Boolean);
-function dragCard(card, onDrop, onTap) {
+// Pointer Events cover mouse, touch and pen. Dropped on a `sel` element -> onDrop(el);
+// a tap without moving -> onTap (if any); anywhere else it springs back.
+const dropAt = (ev, sel) => document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest(sel)).find(Boolean);
+function dragCard(card, sel, onDrop, onTap) {
   card.addEventListener('pointerdown', e => {
-    if (e.button > 0 || card.classList.contains('gone')) return;
+    if (e.button > 0 || card.disabled || card.classList.contains('gone')) return;
+    card._dragged = false;
     const x0 = e.clientX, y0 = e.clientY;
     let moved = false;
     card.setPointerCapture(e.pointerId);
@@ -700,16 +708,17 @@ function dragCard(card, onDrop, onTap) {
       if (!moved && Math.hypot(card._dx, card._dy) < 8) return;
       moved = true;
       card.style.transform = `translate(${card._dx}px, ${card._dy}px) scale(.85)`;
-      const over = basketAt(ev);
-      app.querySelectorAll('.basket').forEach(b => b.classList.toggle('over', b === over && !b.disabled));
+      const over = dropAt(ev, sel);
+      app.querySelectorAll(sel).forEach(b => b.classList.toggle('over', b === over && !b.disabled));
     };
     const up = ev => {
       card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', up); card.removeEventListener('pointercancel', up);
       card.classList.remove('drag');
-      app.querySelectorAll('.basket.over').forEach(b => b.classList.remove('over'));
-      if (!moved) { card._dx = card._dy = 0; return onTap(); }
-      const b = ev.type === 'pointerup' && basketAt(ev);
-      if (b && !b.disabled) return onDrop(b.dataset.s);
+      app.querySelectorAll(sel).forEach(b => b.classList.remove('over'));
+      if (!moved) { card._dx = card._dy = 0; return onTap?.(); }
+      card._dragged = true;   // the click that follows a drag isn't a tap
+      const b = ev.type === 'pointerup' && dropAt(ev, sel);
+      if (b && !b.disabled) return onDrop(b);
       card.style.transform = ''; card._dx = card._dy = 0;
     };
     card.addEventListener('pointermove', move); card.addEventListener('pointerup', up); card.addEventListener('pointercancel', up);
@@ -841,6 +850,203 @@ async function memFlip(i, el) {
   G.up = []; G.busy = false;
 }
 
+/* ============ game: 拼拼看 (blend symbols into a syllable / build a word from its symbols) ============ */
+// A 看拼音找圖: the slide sounds out ㄇ…ㄠ, the child picks the picture (3 choices).
+// B 聽音拼出來: hear a word, put its symbols into the column in order (+ 2 decoys).
+// One-character words only for now; tone is shown but not asked.
+const SPELL_MIN = 10;   // learned symbols before it unlocks
+let ONE = [];           // one-character words: {w, p: {i, m, f, t}, parts, tone} — filled at boot
+const sylKey = p => p.i + p.m + p.f;   // same sounds apart from tone
+// near-misses for picture choices: same 聲母, or same 介音 + 韻母 — never the same sounds (書 / 樹)
+const near = (o, pool) => pool.filter(x => sylKey(x.p) !== sylKey(o.p) &&
+  ((o.p.i && x.p.i === o.p.i) || (o.p.m + o.p.f && x.p.m + x.p.f === o.p.m + o.p.f)));
+
+function spellGame() {
+  if (Z.symbols.filter(x => level(x.s) === 3).length < SPELL_MIN) return go('');
+  // words made only of symbols the child has seen, weakest symbols first
+  const seen = new Set(seenSyms());
+  const score = o => o.parts.reduce((a, s) => a + weight(s), 0) / o.parts.length - o.parts.filter(s => !seen.has(s)).length * 10;
+  const picked = [];
+  for (const o of ONE.map(o => [score(o), o]).sort((a, b) => b[0] - a[0]).map(x => x[1]))
+    if (picked.length < ROUND && !picked.some(x => sylKey(x.p) === sylKey(o.p))) picked.push(o);
+  // A and B take turns, starting with the easier A
+  const qs = shuffle(picked).map((o, k) => k % 2 ? spellB(o) : spellA(o));
+  G = { cfg: { game: 'spell' }, qs, k: 0, results: [], over: false, told: {}, newStickers: [], started: Date.now() };
+  renderSpell();
+}
+function spellA(o) {
+  const opts = [o];
+  for (const x of [...shuffle(near(o, ONE)), ...shuffle(ONE)])
+    if (opts.length < 3 && !opts.some(y => sylKey(y.p) === sylKey(x.p))) opts.push(x);
+  return { type: 'A', ...o, opts: shuffle(opts) };
+}
+function spellB(o) {
+  const extra = [];   // 2 decoys, near-misses of the word's own symbols first (尺 has only one symbol)
+  for (let k = 0; extra.length < 2; k++) extra.push(...distractors(o.parts[k % o.parts.length], 1, [...o.parts, ...extra].join('')));
+  return { type: 'B', ...o, tiles: shuffle([...o.parts, ...extra]) };
+}
+
+// the slide: ball starts on the ladder platform, stops at each symbol (聲母 → 介音 → 韻母, tone on the last)
+function slideSVG(q) {
+  return `<svg class="slide" viewBox="0 0 300 190" aria-hidden="true">
+    <path d="M34 48 V182 M58 48 V182 M34 80 H58 M34 112 H58 M34 144 H58 M34 176 H58" class="sl-ladder"/>
+    <path d="M28 46 H86" class="sl-top"/>
+    <path d="M86 46 C 160 46, 170 168, 286 168" class="sl-rail"/>
+    <path d="M86 46 C 160 46, 170 168, 286 168" class="sl-path"/>
+    ${q.parts.map((s, k) => `<text class="sl-sym" data-k="${k}">${s}${k === q.parts.length - 1 && q.tone ? `<tspan class="sl-tn">${q.tone}</tspan>` : ''}</text>`).join('')}
+    <circle class="sl-ball" r="11" cx="57" cy="34"/>
+  </svg>`;
+}
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function slideSteps(q, svg, withWord) {
+  const path = svg.querySelector('.sl-path'), L = path.getTotalLength(), n = q.parts.length;
+  const stop = k => L * (n > 1 ? 0.12 + 0.62 * k / (n - 1) : 0.4);
+  const ball = svg.querySelector('.sl-ball'), syms = [...svg.querySelectorAll('.sl-sym')];
+  const put = l => { const p = path.getPointAtLength(l); ball.setAttribute('cx', p.x); ball.setAttribute('cy', p.y - 12); };
+  syms.forEach((el, k) => { const p = path.getPointAtLength(stop(k)); el.setAttribute('x', p.x + 14); el.setAttribute('y', p.y - 16); });
+  let at = 0;
+  // slides faster as it goes, like a real slide; reduced motion jumps from stop to stop
+  const roll = to => () => new Promise(res => {
+    const from = at; at = to;
+    if (REDUCED) { put(to); return res(); }
+    const ms = 250 + 900 * Math.abs(to - from) / L, t0 = performance.now();
+    const f = now => { const k = Math.min(1, (now - t0) / ms); put(from + (to - from) * k * k); k < 1 && svg.isConnected ? requestAnimationFrame(f) : res(); };
+    requestAnimationFrame(f);
+  });
+  return [
+    () => { syms.forEach(el => el.classList.remove('lit')); svg.classList.remove('end'); at = 0; put(0); },
+    ...q.parts.flatMap((s, k) => [roll(stop(k)), () => { syms[k].classList.add('lit'); return saySym(s); }, 100]),
+    roll(L), () => svg.classList.add('end'),
+    withWord && (() => sayWord(q.w)),
+  ];
+}
+
+const SPELL_TITLE = { A: '看拼音，找到圖片！', B: '聽聽看，拼出來！' };
+const SPELL_INTRO = { A: '跟著溜滑梯念念看，找到對的圖片。', B: '聽聽看，把注音一個一個放進格子裡。' };
+function renderSpell() {
+  if (G.k >= G.qs.length) return renderDone();
+  const q = G.qs[G.k];
+  q.tries = 0; q.locked = false; q.at = 0; q.sel = null;
+  const body = q.type === 'A'
+    ? `<button class="slide-box" data-act="slide" aria-label="再聽一次">${slideSVG(q)}</button>
+       <div class="opts pics">${q.opts.map(o => `<button class="opt pic" data-act="pick" data-w="${esc(o.w)}">${img(o.w)}</button>`).join('')}</div>`
+    : `<div class="spell-row">
+         <button class="q-pic sp-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}</button>
+         <div class="slots" data-act="slots" aria-label="注音格子">${q.parts.map((_, k) => `<span class="slot" data-k="${k}"></span>`).join('')}${q.tone ? `<i class="tn">${q.tone}</i>` : ''}</div>
+       </div>
+       <div class="tiles">${q.tiles.map(s => `<button class="tile" data-act="tile" data-s="${s}">${s}</button>`).join('')}</div>
+       <p class="note">把注音拖進格子，或點一下注音、再點格子。</p>
+       <div class="slide-box hint" hidden>${slideSVG(q)}</div>`;
+  app.innerHTML = `
+    ${roundBar()}
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">${SPELL_TITLE[q.type]}</div></div>
+      ${body}
+      <div class="fb" id="fb"></div>
+      <div id="next"></div>
+    </div>`;
+  const svg = $('.slide');
+  const slide = () => slideSteps(q, svg, q.type === 'B' || q.locked);
+  ACT.quit = () => { G = null; go(''); };
+  ACT.next = () => { hush(); G.k++; renderSpell(); };
+  ACT.slide = () => seq(slide());
+  ACT.replay = () => seq([() => sayWord(q.w)]);
+  ACT.pick = el => spellPick(q, el, slide);
+  ACT.tile = el => {
+    if (el._dragged) { el._dragged = false; return; }
+    if (q.locked || el.disabled) return;
+    q.sel = el.dataset.s;
+    app.querySelectorAll('.tile').forEach(t => t.classList.toggle('sel', t === el));
+    seq([() => saySym(q.sel)]);
+  };
+  ACT.slots = () => { if (q.sel) spellPlace(q, q.sel, slide); };
+  app.querySelectorAll('.tile').forEach(t => dragCard(t, '.slots', () => spellPlace(q, t.dataset.s, slide)));
+  if (q.type === 'A') slideSteps(q, svg)[0]();   // lay out the symbols before the first run
+  const intro = !G.told[q.type];
+  G.told[q.type] = true;
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || q.locked || q.tries || q.at || location.hash !== '#/spell') return;
+    seq([...(intro ? narrate({ t: SPELL_INTRO[q.type], ...FEI }, 200) : []), ...(q.type === 'A' ? slide() : [() => sayWord(q.w)])]);
+  }, 300);
+}
+
+// both types record every symbol of the word: firstTry = solved without a single mistake
+function spellSolved(q, firstTry) {
+  q.locked = true;
+  G.results[G.k] = firstTry;
+  for (const s of q.parts) record(s, firstTry);
+  G.newStickers.push(...unlockStickers());
+  // B spelled right first time in 2 different rounds -> the word's picture joins the sticker book
+  if (q.type === 'B' && firstTry) {
+    const rec = (S.spell['zh:' + q.w] ??= { ok: 0, round: 0 });
+    if (rec.round !== G.started) { rec.ok++; rec.round = G.started; }
+    if (rec.ok >= 2 && giveSticker(Z.words[q.w].art)) G.newStickers.push(q.w);
+    save();
+  }
+  showNext();
+}
+
+async function spellPick(q, el, slide) {
+  if (q.locked || el.disabled) return;
+  if (el.dataset.w === q.w) {
+    el.classList.add('right'); ding();
+    spellSolved(q, q.tries === 0);
+    app.querySelectorAll('.opt.pic').forEach(b => { if (b !== el) b.disabled = true; });
+    const praise = pick(PRAISE);
+    bubble(praise); setCat('fei', 'smile', 'hop');
+    seq([300, () => sayWord(q.w), 200, ...narrate({ t: praise, ...FEI })]);
+    return;
+  }
+  q.tries++;
+  el.classList.add('wrong'); el.disabled = true; boop();
+  if (q.tries >= 2) {
+    spellSolved(q, false);
+    app.querySelector(`.opt.pic[data-w="${q.w}"]`).classList.add('reveal');
+    app.querySelectorAll('.opt.pic:not(.reveal)').forEach(b => { b.disabled = true; });
+    bubble('是這一個喔！'); setCat('fei', 'calm', 'wobble');
+    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '答案是', ...FEI }), ...slide()]);
+  } else {
+    bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+    // let the child hear what they picked, then the slide again
+    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '再聽聽看', ...FEI }, 150), ...slide()]);
+  }
+}
+
+function spellPlace(q, s, slide) {
+  if (q.locked) return;
+  const tile = app.querySelector(`.tile[data-s="${s}"]`);
+  tile.style.transform = ''; tile._dx = tile._dy = 0;
+  q.sel = null; app.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel'));
+  if (s === q.parts[q.at]) {
+    const slot = app.querySelector(`.slot[data-k="${q.at}"]`);
+    slot.textContent = s; slot.classList.add('filled');
+    tile.disabled = true; tile.classList.add('used');
+    app.querySelectorAll('.tile.reveal').forEach(t => t.classList.remove('reveal'));
+    if (++q.at < q.parts.length) return seq([() => saySym(s)]);
+    // spelled: run the slide once more so the sounds join up into the word
+    ding(); spellSolved(q, q.tries === 0);
+    app.querySelectorAll('.tile').forEach(t => { t.disabled = true; });
+    $('.slots').classList.add('done');
+    const praise = pick(PRAISE);
+    bubble(q.tries ? `對了，${q.w}！` : praise); setCat('fei', 'smile', 'hop');
+    $('.hint').hidden = false;
+    seq([...slide(), 200, ...narrate({ t: q.tries ? '對了！' : praise, ...FEI })]);
+    return;
+  }
+  q.tries++; boop();
+  tile.classList.remove('no'); void tile.offsetWidth; tile.classList.add('no');
+  if (!q.parts.includes(s)) tile.disabled = true;
+  bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+  if (q.tries === 1) {   // first mistake: the slide is the hint
+    $('.hint').hidden = false;
+    seq([350, ...narrate({ t: '看溜滑梯，再聽聽看', ...FEI }, 150), ...slide()]);
+  } else {               // after that: point at the symbol that goes next
+    const want = q.parts[q.at];
+    app.querySelector(`.tile[data-s="${want}"]`).classList.add('reveal');
+    seq([350, ...narrate({ t: '下一個是', ...FEI }), () => saySym(want)]);
+  }
+}
+
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
   if (G.over) return;           // re-rendered by navigation: don't count the round twice
@@ -862,7 +1068,7 @@ function renderDone() {
       <div class="duo small">${catEl('pang', 'happy', 'dance')}${catEl('fei', tired ? 'yawn' : 'smile')}</div>
       <h2>${msg}</h2>
       <div class="stars" aria-label="${stars} 顆星">${marks.map((r, i) => `<span class="${r ? 'on' : 'off'}" style="animation-delay:${i * 0.15}s">★</span>`).join('')}</div>
-      <div class="recap">${G.qs.map((q, i) => `<span class="g-${SYM[q.t].g} ${G.cfg.game === 'memory' || G.results[i] ? 'ok' : 'no'}">${q.t}</span>`).join('')}</div>
+      <div class="recap">${G.qs.map((q, i) => `<span class="g-${q.t ? SYM[q.t].g : 'm'} ${G.cfg.game === 'memory' || G.results[i] ? 'ok' : 'no'}">${q.t || q.w}</span>`).join('')}</div>
       ${firstToday ? `<div class="stamp-new"><span class="stamp">${day.stamp}</span><span>今天的章蓋好了！</span></div>` : ''}
       ${fresh.length ? `<div class="new-stk"><p>拿到新貼紙！</p><div>${fresh.map((w, i) => `<span style="animation-delay:${0.6 + i * 0.12}s">${img(w)}</span>`).join('')}</div></div>` : ''}
       ${tired ? `<p class="rest">今天已經玩了 ${day.rounds} 輪，好厲害！<br>菲菲想睡覺了，我們明天再玩吧。</p>` : ''}
@@ -872,7 +1078,7 @@ function renderDone() {
         <a class="btn ${tired ? 'primary ' : ''}big" href="#/">回首頁</a>
       </div>
     </div>`;
-  ACT.again = () => G.cfg.game === 'sort' ? sortGame() : G.cfg.game === 'memory' ? memoryGame() : startRound(G.cfg);
+  ACT.again = () => G.cfg.game ? routes[G.cfg.game]() : startRound(G.cfg);
   if (stars >= 3) setTimeout(() => tone([523, 659, 784, 1047], 0.16), 200);
   seq([700, ...narrate(
     { t: '耶！', ...PANG }, { t: msg, ...FEI },
@@ -940,6 +1146,11 @@ function settings() {
     (bySlug[a] ??= { art: a, word: w, cat: ART[a]?.cat || 'object', syms: [] }).syms.push(x.s);
   }
   STICKERS = Object.values(bySlug);
+  // 拼拼看 uses the one-character words; their Gemini clip doubles as the syllable's sound
+  ONE = Object.keys(Z.words).filter(w => [...w].length === 1).map(w => {
+    const p = parseSyl(Z.words[w].zy);
+    return { w, p, parts: sylParts(p), tone: TONE_MARK[p.t] };
+  });
   unlockStickers();   // older saves: hand out stickers for symbols learned before the book existed
   document.body.insertAdjacentHTML('beforeend', CAT_DEFS);
   route();
