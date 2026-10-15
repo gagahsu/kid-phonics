@@ -392,7 +392,7 @@ function home() {
         : `<a href="#/memory"><span class="ico">🃏</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">翻開牌，找出符號跟它的圖片</span></span>${QUIET}</a>`}
       ${spellLeft
         ? `<a href="#/spell" class="locked" data-act="lockSpell"><span class="ico">🔒</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">再學會 ${spellLeft} 個符號（★），就能玩</span></span>${SOFT}</a>`
-        : `<a href="#/spell"><span class="ico">🛝</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">注音溜滑梯，拼出一個字</span></span>${SOFT}</a>`}
+        : `<a href="#/spell"><span class="ico">🧩</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">把注音拼成一個字</span></span>${SOFT}</a>`}
       ${bubLeft
         ? `<a href="#/bubbles" class="locked" data-act="lockBub"><span class="ico">🔒</span><span class="mt"><span class="t">泡泡</span><br><span class="s">再學會 ${bubLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
         : `<a href="#/bubbles"><span class="ico">🫧</span><span class="mt"><span class="t">泡泡</span><br><span class="s">聽聲音，戳破對的泡泡，複習學會的符號</span></span>${QUIET}</a>`}
@@ -1151,9 +1151,9 @@ async function memFlip(i, el) {
 }
 
 /* ============ game: 拼拼看 (blend symbols into a syllable / build a word from its symbols) ============ */
-// A 看拼音找圖: the slide sounds out ㄇ…ㄠ, the child picks the picture (3 choices).
+// A 看拼音找圖: the blend card sounds out ㄇ…ㄠ, the child picks the picture (3 choices).
 // B 聽音拼出來: hear a word, put its symbols into the column in order (+ 2 decoys).
-// One-character words only for now; tone is shown but not asked.
+// One-character words only. B ends with a tone step: 一聲 ˊ ˇ ˋ (no ˙: none of the words is 輕聲).
 const SPELL_MIN = 10;   // learned symbols before it unlocks
 let ONE = [];           // one-character words: {w, p: {i, m, f, t}, parts, tone} — filled at boot
 const sylKey = p => p.i + p.m + p.f;   // same sounds apart from tone
@@ -1186,57 +1186,47 @@ function spellB(o) {
   return { type: 'B', ...o, tiles: shuffle([...o.parts, ...extra]) };
 }
 
-// the slide: ball starts on the ladder platform, stops at each symbol (聲母 → 介音 → 韻母, tone on the last)
-function slideSVG(q) {
-  return `<svg class="slide" viewBox="0 0 300 190" aria-hidden="true">
-    <path d="M34 48 V182 M58 48 V182 M34 80 H58 M34 112 H58 M34 144 H58 M34 176 H58" class="sl-ladder"/>
-    <path d="M28 46 H86" class="sl-top"/>
-    <path d="M86 46 C 160 46, 170 168, 286 168" class="sl-rail"/>
-    <path d="M86 46 C 160 46, 170 168, 286 168" class="sl-path"/>
-    ${q.parts.map((s, k) => `<text class="sl-sym" data-k="${k}">${s}${k === q.parts.length - 1 && q.tone ? `<tspan class="sl-tn">${q.tone}</tspan>` : ''}</text>`).join('')}
-    <circle class="sl-ball" r="11" cx="57" cy="34"/>
-  </svg>`;
+// the blend card: the word's zhuyin in a column, as in the textbook. Each symbol lights up as it's
+// said (聲母 → 介音 → 韻母), then the column closes up into one syllable and the word plays.
+// B blends on its own answer column instead: empty slots show the missing symbols faintly while it runs.
+function blendCard(q) {
+  return `<span class="blend" aria-hidden="true"><span class="bl-col">${q.parts.map((s, k) =>
+    `<span class="bl-sym" data-k="${k}">${s}</span>`).join('')}${q.tone ? `<i class="bl-tn">${q.tone}</i>` : ''}</span></span>`;
 }
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-function slideSteps(q, svg, withWord) {
-  const path = svg.querySelector('.sl-path'), L = path.getTotalLength(), n = q.parts.length;
-  const stop = k => L * (n > 1 ? 0.12 + 0.62 * k / (n - 1) : 0.4);
-  const ball = svg.querySelector('.sl-ball'), syms = [...svg.querySelectorAll('.sl-sym')];
-  const put = l => { const p = path.getPointAtLength(l); ball.setAttribute('cx', p.x); ball.setAttribute('cy', p.y - 12); };
-  syms.forEach((el, k) => { const p = path.getPointAtLength(stop(k)); el.setAttribute('x', p.x + 14); el.setAttribute('y', p.y - 16); });
-  let at = 0;
-  // slides faster as it goes, like a real slide; reduced motion jumps from stop to stop
-  const roll = to => () => new Promise(res => {
-    const from = at; at = to;
-    if (REDUCED) { put(to); return res(); }
-    const ms = 250 + 900 * Math.abs(to - from) / L, t0 = performance.now();
-    const f = now => { const k = Math.min(1, (now - t0) / ms); put(from + (to - from) * k * k); k < 1 && svg.isConnected ? requestAnimationFrame(f) : res(); };
-    requestAnimationFrame(f);
-  });
+function blendSteps(q, card, withWord) {
+  const syms = [...card.querySelectorAll('.bl-sym, .slot')], slots = card.classList.contains('slots');
   return [
-    () => { syms.forEach(el => el.classList.remove('lit')); svg.classList.remove('end'); at = 0; put(0); },
-    ...q.parts.flatMap((s, k) => [roll(stop(k)), () => { syms[k].classList.add('lit'); return saySym(s); }, 100]),
-    roll(L), () => svg.classList.add('end'),
+    () => { blendClear(card); slots && card.classList.add('ghost'); },
+    250,
+    ...q.parts.flatMap((s, k) => [() => { syms[k].classList.add('lit'); return saySym(s); }, 250]),
+    () => card.classList.add('joined'), REDUCED ? 0 : 350,
     withWord && (() => sayWord(q.w)),
+    slots && 400, slots && (() => blendClear(card)),
   ];
 }
+const blendClear = card => {
+  card.classList.remove('joined', 'ghost');
+  card.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+};
 
+const TONES = [{ t: 1, m: '', name: '一聲' }, { t: 2, m: 'ˊ', name: '二聲' }, { t: 3, m: 'ˇ', name: '三聲' }, { t: 4, m: 'ˋ', name: '四聲' }];
 const SPELL_TITLE = { A: '看拼音，找到圖片！', B: '聽聽看，拼出來！' };
-const SPELL_INTRO = { A: '跟著溜滑梯念念看，找到對的圖片。', B: '聽聽看，把注音一個一個放進格子裡。' };
+const SPELL_INTRO = { A: '跟著注音念念看，找到對的圖片。', B: '聽聽看，把注音一個一個放進格子裡。' };
 function renderSpell() {
   if (G.k >= G.qs.length) return renderDone();
   const q = G.qs[G.k];
-  q.tries = 0; q.locked = false; q.at = 0; q.sel = null;
+  q.tries = 0; q.toneTries = 0; q.locked = false; q.at = 0; q.sel = null;
   const body = q.type === 'A'
-    ? `<button class="slide-box" data-act="slide" aria-label="再聽一次">${slideSVG(q)}</button>
+    ? `<button class="blend-box" data-act="blend" aria-label="再聽一次">${blendCard(q)}</button>
        <div class="opts pics">${q.opts.map(o => `<button class="opt pic" data-act="pick" data-w="${esc(o.w)}">${img(o.w)}</button>`).join('')}</div>`
     : `<div class="spell-row">
          <button class="q-pic sp-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}</button>
-         <div class="slots" data-act="slots" aria-label="注音格子">${q.parts.map((_, k) => `<span class="slot" data-k="${k}"></span>`).join('')}${q.tone ? `<i class="tn">${q.tone}</i>` : ''}</div>
+         <div class="slots" data-act="slots" aria-label="注音格子">${q.parts.map((_, k) => `<span class="slot" data-k="${k}" data-g="${q.parts[k]}"></span>`).join('')}<i class="tn"></i></div>
        </div>
        <div class="tiles">${q.tiles.map(s => `<button class="tile" data-act="tile" data-s="${s}">${s}</button>`).join('')}</div>
-       <p class="note">把注音拖進格子，或點一下注音、再點格子。</p>
-       <div class="slide-box hint" hidden>${slideSVG(q)}</div>`;
+       <div class="tones" hidden>${TONES.map(o => `<button class="tone" data-act="tone" data-t="${o.t}" aria-label="${o.name}"><b>${o.m}</b><small>${o.name}</small></button>`).join('')}</div>
+       <p class="note">把注音拖進格子，或點一下注音、再點格子。</p>`;
   app.innerHTML = `
     ${roundBar()}
     <div class="q">
@@ -1245,13 +1235,13 @@ function renderSpell() {
       <div class="fb" id="fb"></div>
       <div id="next"></div>
     </div>`;
-  const svg = $('.slide');
-  const slide = () => slideSteps(q, svg, q.type === 'B' || q.locked);
+  const card = $(q.type === 'A' ? '.blend' : '.slots');
+  const blend = () => blendSteps(q, card, q.type === 'B' || q.locked);
   ACT.quit = () => { G = null; go(''); };
   ACT.next = () => { hush(); G.k++; renderSpell(); };
-  ACT.slide = () => seq(slide());
+  ACT.blend = () => seq(blend());
   ACT.replay = () => seq([() => sayWord(q.w)]);
-  ACT.pick = el => spellPick(q, el, slide);
+  ACT.pick = el => spellPick(q, el, blend);
   ACT.tile = el => {
     if (el._dragged) { el._dragged = false; return; }
     if (q.locked || el.disabled) return;
@@ -1259,22 +1249,24 @@ function renderSpell() {
     app.querySelectorAll('.tile').forEach(t => t.classList.toggle('sel', t === el));
     seq([() => saySym(q.sel)]);
   };
-  ACT.slots = () => { if (q.sel) spellPlace(q, q.sel, slide); };
-  app.querySelectorAll('.tile').forEach(t => dragCard(t, '.slots', () => spellPlace(q, t.dataset.s, slide)));
-  if (q.type === 'A') slideSteps(q, svg)[0]();   // lay out the symbols before the first run
+  ACT.slots = () => { if (q.sel) spellPlace(q, q.sel, blend); };
+  ACT.tone = el => spellTone(q, el);
+  app.querySelectorAll('.tile').forEach(t => dragCard(t, '.slots', () => spellPlace(q, t.dataset.s, blend)));
   const intro = !G.told[q.type];
   G.told[q.type] = true;
   setTimeout(() => {
     if (G?.qs[G.k] !== q || q.locked || q.tries || q.at || location.hash !== '#/spell') return;
-    seq([...(intro ? narrate({ t: SPELL_INTRO[q.type], ...FEI }, 200) : []), ...(q.type === 'A' ? slide() : [() => sayWord(q.w)])]);
+    seq([...(intro ? narrate({ t: SPELL_INTRO[q.type], ...FEI }, 200) : []), ...(q.type === 'A' ? blend() : [() => sayWord(q.w)])]);
   }, 300);
 }
 
-// both types record every symbol of the word: firstTry = solved without a single mistake
-function spellSolved(q, firstTry) {
+// both types record every symbol of the word: firstTry = solved without a single mistake.
+// A wrong tone doesn't count against the symbols, but the word isn't first-try any more.
+function spellSolved(q, symFirst, toneFirst = true) {
+  const firstTry = symFirst && toneFirst;
   q.locked = true;
   G.results[G.k] = firstTry;
-  for (const s of q.parts) record(s, firstTry);
+  for (const s of q.parts) record(s, symFirst);
   G.newStickers.push(...unlockStickers());
   // B spelled right first time in 2 different rounds -> the word's picture joins the sticker book
   if (q.type === 'B' && firstTry) {
@@ -1286,7 +1278,7 @@ function spellSolved(q, firstTry) {
   showNext();
 }
 
-async function spellPick(q, el, slide) {
+async function spellPick(q, el, blend) {
   if (q.locked || el.disabled) return;
   if (el.dataset.w === q.w) {
     el.classList.add('right'); ding();
@@ -1304,46 +1296,79 @@ async function spellPick(q, el, slide) {
     app.querySelector(`.opt.pic[data-w="${q.w}"]`).classList.add('reveal');
     app.querySelectorAll('.opt.pic:not(.reveal)').forEach(b => { b.disabled = true; });
     bubble('是這一個喔！'); setCat('fei', 'calm', 'wobble');
-    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '答案是', ...FEI }), ...slide()]);
+    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '答案是', ...FEI }), ...blend()]);
   } else {
     bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
-    // let the child hear what they picked, then the slide again
-    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '再聽聽看', ...FEI }, 150), ...slide()]);
+    // let the child hear what they picked, then the blend again
+    seq([300, () => sayWord(el.dataset.w), 300, ...narrate({ t: '再聽聽看', ...FEI }, 150), ...blend()]);
   }
 }
 
-function spellPlace(q, s, slide) {
+function spellPlace(q, s, blend) {
   if (q.locked) return;
   const tile = app.querySelector(`.tile[data-s="${s}"]`);
   tile.style.transform = ''; tile._dx = tile._dy = 0;
   q.sel = null; app.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel'));
+  blendClear($('.slots'));   // a hint still running: don't leave the faint answers up
   if (s === q.parts[q.at]) {
     const slot = app.querySelector(`.slot[data-k="${q.at}"]`);
     slot.textContent = s; slot.classList.add('filled');
     tile.disabled = true; tile.classList.add('used');
     app.querySelectorAll('.tile.reveal').forEach(t => t.classList.remove('reveal'));
     if (++q.at < q.parts.length) return seq([() => saySym(s)]);
-    // spelled: run the slide once more so the sounds join up into the word
-    ding(); spellSolved(q, q.tries === 0);
+    // symbols done: run the blend once more so the sounds join up into the word (its tone mark
+    // stays hidden), then ask for the tone
+    ding();
     app.querySelectorAll('.tile').forEach(t => { t.disabled = true; });
-    $('.slots').classList.add('done');
-    const praise = pick(PRAISE);
-    bubble(q.tries ? `對了，${q.w}！` : praise); setCat('fei', 'smile', 'hop');
-    $('.hint').hidden = false;
-    seq([...slide(), 200, ...narrate({ t: q.tries ? '對了！' : praise, ...FEI })]);
+    $('.tiles').hidden = true; $('.note').hidden = true; $('.tones').hidden = false;
+    bubble('是第幾聲呢？'); setCat('fei', 'smile', 'hop');
+    seq([...blend(), 200, ...narrate({ t: '是第幾聲呢？', ...FEI })]);
     return;
   }
   q.tries++; boop();
   tile.classList.remove('no'); void tile.offsetWidth; tile.classList.add('no');
   if (!q.parts.includes(s)) tile.disabled = true;
   bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
-  if (q.tries === 1) {   // first mistake: the slide is the hint
-    $('.hint').hidden = false;
-    seq([350, ...narrate({ t: '看溜滑梯，再聽聽看', ...FEI }, 150), ...slide()]);
+  if (q.tries === 1) {   // first mistake: blend the column as the hint
+    seq([350, ...narrate({ t: '看注音，再聽聽看', ...FEI }, 150), ...blend()]);
   } else {               // after that: point at the symbol that goes next
     const want = q.parts[q.at];
     app.querySelector(`.tile[data-s="${want}"]`).classList.add('reveal');
     seq([350, ...narrate({ t: '下一個是', ...FEI }), () => saySym(want)]);
+  }
+}
+
+// the last step of B: pick the tone. Tapping a button says its name first.
+function spellTone(q, el) {
+  if (q.locked || el.disabled) return;
+  blendClear($('.slots'));   // tapped while the blend was still running
+  const o = TONES.find(x => x.t === +el.dataset.t), name = narrate({ t: o.name, ...FEI });
+  if (o.t === q.p.t) {
+    el.classList.add('right'); ding();
+    app.querySelectorAll('.tone').forEach(b => { b.disabled = true; b.classList.remove('reveal'); });
+    const tn = $('.slots .tn');
+    tn.textContent = o.m; tn.classList.add('filled');
+    $('.slots').classList.add('done');
+    spellSolved(q, q.tries === 0, q.toneTries === 0);
+    const ok = !q.tries && !q.toneTries, praise = pick(PRAISE);
+    bubble(ok ? praise : `對了，${q.w}！`); setCat('fei', 'smile', 'hop');
+    // 一聲 has no mark: say so the first time it comes up in a round
+    const flat = o.t === 1 && !G.told.flat;
+    if (flat) G.told.flat = true;
+    seq([...name, 200, () => sayWord(q.w), 200, ...(flat ? narrate({ t: '一聲不用寫喔', ...FEI }, 200) : []), ...narrate({ t: ok ? praise : '對了！', ...FEI })]);
+    return;
+  }
+  q.toneTries++; boop();
+  el.classList.add('wrong'); el.disabled = true;
+  setCat('fei', 'calm', 'wobble');
+  if (q.toneTries >= 2) {   // point at the right one; the child still taps it
+    const want = TONES.find(x => x.t === q.p.t);
+    app.querySelector(`.tone[data-t="${want.t}"]`).classList.add('reveal');
+    bubble('是這一個喔！');
+    seq([...name, 300, () => sayWord(q.w), 200, ...narrate({ t: '答案是', ...FEI }, { t: want.name, ...FEI })]);
+  } else {
+    bubble('再聽聽看～');
+    seq([...name, 300, ...narrate({ t: '再聽聽看', ...FEI }, 150), () => sayWord(q.w)]);
   }
 }
 

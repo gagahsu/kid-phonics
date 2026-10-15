@@ -380,17 +380,25 @@ img { display: block; max-width: 100%; }
 .mcard.done .face { border-color: var(--green); animation: pop .35s ease; }
 
 /* 拼拼看 */
-.slide-box { display: block; margin: 0 auto 12px; padding: 6px; border: 0; border-radius: 24px; background: var(--paper); box-shadow: var(--shadow); width: min(100%, 340px); }
-.slide { display: block; width: 100%; height: auto; overflow: visible; }
-.sl-ladder { stroke: #C9A36A; stroke-width: 6; stroke-linecap: round; fill: none; }
-.sl-top { stroke: #E0A100; stroke-width: 10; stroke-linecap: round; }
-.sl-rail { stroke: #E0A100; stroke-width: 22; stroke-linecap: round; fill: none; }
-.sl-path { stroke: var(--yellow); stroke-width: 12; stroke-linecap: round; fill: none; }
-.sl-ball { fill: var(--red); stroke: #fff; stroke-width: 3; }
-.sl-sym { font-family: var(--kai); font-size: 40px; font-weight: 700; fill: #B9B2A4; transition: fill .2s; }
-.sl-sym .sl-tn { font-size: 24px; }
-.sl-sym.lit { fill: var(--ink); }
-.slide.end .sl-sym { fill: var(--gf); }
+.blend-box {
+  display: grid; place-items: center; margin: 0 auto 12px; padding: 14px; border: 0; border-radius: 24px;
+  background: var(--paper); box-shadow: var(--shadow); width: min(100%, 340px); min-height: 240px;   /* fits 3 spread symbols: no jump when joined */
+}
+/* zhuyin column: symbols spread apart and grey, light up one by one, then close up into one syllable */
+.blend { display: block; }
+.bl-col {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 6px 34px 6px 10px;
+  border-radius: 16px; border: 3px solid transparent; transition: gap .35s ease, border-color .35s, background .35s;
+}
+.bl-sym {
+  font-family: var(--kai); font-size: 52px; font-weight: 700; line-height: 1; color: #C9C1B2;
+  padding: 2px 8px; border-radius: 12px; transition: color .2s, background .2s, transform .2s;
+}
+.bl-sym.lit { color: var(--ink); background: #FFF3C4; transform: scale(1.08); }
+.bl-tn { position: absolute; right: 4px; bottom: 12px; font-style: normal; font-family: var(--kai); font-size: 40px; font-weight: 700; line-height: 1; color: var(--ink); }
+.blend.joined .bl-col { gap: 0; border-color: var(--good); background: var(--good-bg); }
+.blend.joined .bl-sym { color: var(--ink); background: none; transform: none; }
+@media (prefers-reduced-motion: reduce) { .bl-col, .bl-sym { transition: none; } }
 .opts.pics { grid-template-columns: repeat(3, minmax(0, 120px)); }
 .opt.pic { aspect-ratio: 1; padding: 8px; }
 .opt.pic img { width: 100%; height: 100%; object-fit: contain; }
@@ -408,7 +416,27 @@ img { display: block; max-width: 100%; }
   font-family: var(--kai); font-size: 48px; font-weight: 700; line-height: 1;
 }
 .slot.filled { border: 3px solid transparent; background: var(--good-bg); animation: pop .3s ease; }
-.slots .tn { position: absolute; right: -24px; bottom: 18px; font-style: normal; font-family: var(--kai); font-size: 30px; font-weight: 700; }
+/* B's blend runs on the slots: faint answers in empty slots, each slot lights up, then a green frame */
+.slots.ghost .slot:not(.filled)::after { content: attr(data-g); color: #C9C1B2; }
+.slot.lit { background: #FFF3C4; transition: background .2s; }
+.slots.joined { border-color: var(--good); }
+.slots .tn {
+  position: absolute; right: -38px; bottom: 14px; width: 30px; height: 40px; border-radius: 8px; border: 2px dashed #E2D4BA;
+  display: grid; place-items: center; font-style: normal; font-family: var(--kai); font-size: 44px; font-weight: 700; line-height: 1;
+}
+.slots .tn.filled { border-color: transparent; animation: pop .3s ease; }
+/* 拼拼看 tone step: 一聲 has no mark, so its button is just the caption */
+.tiles[hidden], .tones[hidden] { display: none; }
+.tones { display: flex; justify-content: center; gap: 12px; margin-bottom: 6px; }
+.tone {
+  width: 76px; height: 84px; border-radius: 18px; border: 4px solid transparent; background: var(--paper); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 6px 0;
+}
+.tone b { font-family: var(--kai); font-size: 44px; line-height: 1; height: 44px; }
+.tone small { font-size: 15px; color: var(--ink-soft); }
+.tone.right { border-color: var(--good); background: var(--good-bg); animation: pop .35s ease; }
+.tone.wrong { border-color: var(--oops); background: var(--oops-bg); opacity: .5; animation: shake .35s ease; }
+.tone.reveal { border-color: var(--yellow); animation: pulse .6s ease 2; }
 .tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 6px; }
 .tile {
   width: 72px; height: 72px; border-radius: 18px; border: 4px solid transparent; background: var(--paper); box-shadow: var(--shadow);
