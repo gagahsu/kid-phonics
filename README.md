@@ -119,6 +119,9 @@ py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei
 - 胖胖用 `--style pang --voice Puck`、輸出 `assets/audio/zh/pang`。
 - 一個字的台詞（胖！、菲。）Gemini 容易念兩次，句中的逗號也可能被切成兩段，段數剛好對上時 `split_tts.py` 不會發現。
   每句的秒數要對照字數看，對不上就要手動切。
+- 不完整的台詞片段（「我愛」＋詞、「我也有」＋詞）Gemini 常在前面加語氣詞（嗯、欸）。這種句子在 tab 後加提示：
+  `say exactly these words and nothing else; start right on the first character, no filler sound (no 嗯, 欸, 啊, 呃, no breath) before it`
+  （`work/tts/feed_fix/lines.txt`）。秒數比字數長很多，通常就是前面多了東西。
 
 `assets/audio/zh/pang-word/`：胖胖念的範例詞，全部 154 個（Gemini TTS，2026-10-15，voice `Puck`、style `pang`）。
 抓錯遊戲用的 33 個一字詞先錄、每個附拼音聲調提示；其餘 121 個給教胖胖用，一字詞附提示、多字詞只帶 `tts_hints.tsv`

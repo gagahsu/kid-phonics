@@ -214,8 +214,11 @@ const dots = s => `<span class="dots">${[0, 1, 2].map(i => `<i class="${i < leve
 
 /* ============ cats: 胖胖 (tabby & white, 麒麟尾) and 菲菲 (Russian Blue) ============ */
 // shapes come from design/cats.svg; clip paths / gradient live once in the page (CAT_DEFS)
-const CAT_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <clipPath id="ppBody"><ellipse cx="140" cy="222" rx="80" ry="62"/></clipPath>
+// 胖胖's body by stage (ROADMAP 3.2: rounder as more symbols are learned — the name has to be earned)
+const PP_BODY = [{ cx: 140, cy: 230, rx: 62, ry: 52 }, { cx: 140, cy: 222, rx: 80, ry: 62 }, { cx: 140, cy: 216, rx: 88, ry: 72 }];
+const ppStage = () => { const n = Z ? Z.symbols.filter(x => level(x.s) === 3).length : 0; return n >= 25 ? 2 : n >= 10 ? 1 : 0; };
+const CAT_DEFS = () => `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  ${PP_BODY.map((b, i) => `<clipPath id="ppBody${i}"><ellipse cx="140" cy="${b.cy}" rx="${b.rx}" ry="${b.ry}"/></clipPath>`).join('')}
   <clipPath id="ppHead"><ellipse cx="140" cy="128" rx="72" ry="60"/></clipPath>
   <clipPath id="ffEyeL"><path d="M341 160 Q356 153 371 158 Q369 172 356 173 Q343 172 341 160Z"/></clipPath>
   <clipPath id="ffEyeR"><path d="M393 158 Q408 153 423 160 Q421 172 408 173 Q395 172 393 158Z"/></clipPath>
@@ -242,20 +245,21 @@ const PP_MOUTH = {
   think: `<path d="M131 163 q4.5 -4 9 0 q4.5 4 9 0" class="ln"/>`,
 };
 function pangSVG(mood) {
+  const st = ppStage(), b = PP_BODY[st];
   const eyes = PP_EYES[mood] || PP_EYES.open;
   const mouth = PP_MOUTH[mood] || PP_MOUTH.talk;
   return `<svg viewBox="52 26 214 270" aria-hidden="true">
     <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#8a6c56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M222 252 l4 7" class="st"/>
-    <ellipse cx="140" cy="222" rx="80" ry="62" fill="#FBF8F3"/>
-    <g clip-path="url(#ppBody)">
+    <ellipse cx="140" cy="${b.cy}" rx="${b.rx}" ry="${b.ry}" fill="#FBF8F3"/>
+    <g clip-path="url(#ppBody${st})">
       <path d="M150 168 Q196 166 222 196 L226 290 L176 290 Q186 252 170 222 Q154 196 150 168Z" fill="#8a6c56"/>
       <path d="M180 186 q8 6 10 16 M196 196 q6 8 6 18 M206 222 q4 8 2 18" class="st"/>
       <ellipse cx="78" cy="236" rx="26" ry="22" fill="#8a6c56"/>
       <path d="M68 226 q6 6 4 14 M84 222 q6 8 4 16" class="st"/>
     </g>
-    <ellipse cx="140" cy="222" rx="80" ry="62" fill="none" class="ol"/>
+    <ellipse cx="140" cy="${b.cy}" rx="${b.rx}" ry="${b.ry}" fill="none" class="ol"/>
     <ellipse cx="118" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/><ellipse cx="162" cy="278" rx="17" ry="11" fill="#FBF8F3" class="ol"/>
     <path d="M113 274v7M123 274v7M157 274v7M167 274v7" class="ln" style="stroke-width:1.8"/>
     <path d="M84 98 L78 40 Q80 34 86 37 L124 76Z" fill="#8a6c56" class="ol"/><path d="M90 88 L87 52 L112 78Z" fill="#F4B8BE"/>
@@ -442,23 +446,94 @@ function calendar() {
 }
 
 /* ============ sticker book ============ */
+// a book of pages, 9 big stickers each, one category per page (a long category takes several);
+// turn with ‹ ›, a sideways swipe, or the category tabs
+const STK_PER_PAGE = 9;
+const CAT_ICON = { animal: '🐶', food: '🍎', plant: '🌸', vehicle: '🚗', person: '👪', body: '✋', object: '🧸', sky: '☀️', scene: '⛰️' };
+let stkPage = 0;
+function stkPages() {
+  const cats = [...new Set([...Object.keys(CAT_NAME), ...STICKERS.map(x => x.cat)])];
+  return cats.flatMap(c => {
+    const list = STICKERS.filter(x => x.cat === c), n = Math.ceil(list.length / STK_PER_PAGE);
+    return Array.from({ length: n }, (_, i) => ({ c, list: list.slice(i * STK_PER_PAGE, (i + 1) * STK_PER_PAGE), i, n, all: list }));
+  });
+}
+
 function stickers() {
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
-  const cats = [...new Set([...Object.keys(CAT_NAME), ...STICKERS.map(x => x.cat)])];
-  const sections = cats.map(c => {
-    const list = STICKERS.filter(x => x.cat === c);
-    if (!list.length) return '';
-    const have = list.filter(x => S.stickers[x.art]).length;
-    return `<h3 class="group-h">${CAT_NAME[c] || c}<small>${have} / ${list.length}</small></h3>
-      <div class="stk-grid">${list.map(x => S.stickers[x.art]
-        ? `<button class="stk" data-act="stk" data-w="${esc(x.word)}">${img(x.word)}<span class="cap">${ruby(x.word)}</span></button>`
-        : `<button class="stk lock" data-act="stkLock" data-s="${x.syms[0]}" aria-label="還沒拿到，學會 ${x.syms[0]} 就能拿到">${img(x.word)}<span class="need g-${SYM[x.syms[0]].g}">${x.syms[0]}</span></button>`).join('')}</div>`;
-  }).join('');
-  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的貼紙簿</h2></div>
-    <p class="legend">已收集 <b>${got}</b> / ${STICKERS.length} 張。注音符號學會了（★），它的貼紙就會跑進來。</p>
-    ${sections}`;
-  ACT.stk = el => { flash(el); seq([() => sayWord(el.dataset.w)]); };
+  const pages = stkPages();
+  stkPage = Math.min(stkPage, pages.length - 1);
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的貼紙簿</h2>
+      <span class="stk-count">${got} / ${STICKERS.length}</span></div>
+    <div class="feed">${catEl('pang')}<div class="bubble" id="bubble">${got
+      ? '把貼紙拖給胖胖，或點一下送給牠！' : '學會注音符號（★），就能拿到貼紙送給胖胖。'}</div></div>
+    <div class="stk-tabs" role="tablist">${[...new Set(pages.map(p => p.c))].map(c =>
+      `<button class="stk-tab" role="tab" data-act="stkTab" data-c="${c}" aria-label="${CAT_NAME[c] || c}">${CAT_ICON[c] || '📦'}</button>`).join('')}</div>
+    <div class="stk-book"></div>
+    <div class="stk-nav">
+      <button class="icon-btn" data-act="stkTurn" data-d="-1" aria-label="上一頁">‹</button>
+      <span id="stkNo"></span>
+      <button class="icon-btn" data-act="stkTurn" data-d="1" aria-label="下一頁">›</button>
+    </div>`;
+  const turn = d => { const k = (stkPage + d + pages.length) % pages.length; if (k !== stkPage) { stkPage = k; showPage(d); } };
+  ACT.stkTurn = el => turn(+el.dataset.d);
+  ACT.stkTab = el => { const k = pages.findIndex(p => p.c === el.dataset.c); if (k !== stkPage) { const d = k > stkPage ? 1 : -1; stkPage = k; showPage(d); } };
   ACT.stkLock = el => seq([{ t: '學會', ...FEI }, () => saySym(el.dataset.s), { t: '，就能拿到這張貼紙喔。', ...FEI }]);
+  // a sideways swipe on the page (or a sticker dragged sideways and let go away from 胖胖) turns it
+  const swipe = (dx, dy) => { if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) turn(dx < 0 ? 1 : -1); };
+  const book = $('.stk-book');
+  book.addEventListener('pointerdown', e => {
+    if (e.target.closest('.stk[data-w]')) return;   // stickers handle their own drag
+    const x0 = e.clientX, y0 = e.clientY;
+    book.addEventListener('pointerup', ev => swipe(ev.clientX - x0, ev.clientY - y0), { once: true });
+  });
+
+  function showPage(dir = 0) {
+    const pg = pages[stkPage], have = pg.all.filter(x => S.stickers[x.art]).length;
+    book.innerHTML = `<div class="stk-page${dir ? (dir > 0 ? ' in-r' : ' in-l') : ''}">
+      <h3 class="group-h">${CAT_ICON[pg.c] || ''} ${CAT_NAME[pg.c] || pg.c}<small>${have} / ${pg.all.length}${pg.n > 1 ? `・第 ${pg.i + 1} 頁` : ''}</small></h3>
+      <div class="stk-grid">${pg.list.map(x => S.stickers[x.art]
+        ? `<button class="stk" style="--tilt:${[...x.art].reduce((n, c) => n + c.charCodeAt(0), 0) % 9 - 4}deg" data-w="${esc(x.word)}" data-c="${x.cat}" aria-label="把${esc(x.word)}送給胖胖">${img(x.word)}<span class="cap n${[...x.word].length}">${ruby(x.word)}</span></button>`
+        : `<button class="stk lock" data-act="stkLock" data-s="${x.syms[0]}" aria-label="還沒拿到，學會 ${x.syms[0]} 就能拿到">${img(x.word)}<span class="need g-${SYM[x.syms[0]].g}">${x.syms[0]}</span></button>`).join('')}</div>
+    </div>`;
+    $('#stkNo').textContent = `${stkPage + 1} / ${pages.length}`;
+    app.querySelectorAll('.stk-tab').forEach(t => t.setAttribute('aria-selected', t.dataset.c === pg.c));
+    for (const el of book.querySelectorAll('.stk[data-w]')) {
+      dragCard(el, '.feed .cat', () => feedPang(el), () => feedPang(el), swipe);
+      el.addEventListener('click', e => { if (e.detail === 0) feedPang(el); });   // keyboard: Enter / Space
+    }
+  }
+  showPage();
+}
+
+// 胖胖's reaction by sticker category: a fixed line before or after the word (the word plays from
+// pang-word/, so only these 9 lines need recording); mood + animation for the cat
+const FEED = {
+  food: { pre: '好好吃！我喜歡', mood: 'happy', anim: 'chew' },
+  person: { pre: '我愛', mood: 'happy', anim: 'hop' },
+  animal: { post: '我們一起玩！', mood: 'happy', anim: 'dance' },
+  vehicle: { post: '坐上去，出發囉！', mood: 'oh', anim: 'sway' },
+  object: { post: '我也想要一個！', mood: 'think', anim: 'hop' },
+  plant: { pre: '好漂亮的', mood: 'happy', anim: 'hop' },
+  body: { pre: '我也有', mood: 'talk', anim: 'hop' },
+  sky: { pre: '哇！天上有', mood: 'oh', anim: 'hop' },
+  scene: { pre: '哇！好大的', mood: 'oh', anim: 'hop' },
+};
+function feedPang(el) {
+  const w = el.dataset.w, f = FEED[el.dataset.c] || FEED.object, cat = $('.feed .cat');
+  el.style.transform = ''; el._dx = el._dy = 0;
+  // the picture flies into 胖胖
+  const a = el.querySelector('img').getBoundingClientRect(), b = cat.getBoundingClientRect();
+  const fly = el.querySelector('img').cloneNode();
+  fly.className = 'fly';
+  Object.assign(fly.style, { left: `${a.left}px`, top: `${a.top}px`, width: `${a.width}px`, height: `${a.height}px` });
+  document.body.append(fly);
+  fly.animate([{ transform: 'none', opacity: 1 },
+    { transform: `translate(${b.left + b.width / 2 - a.left - a.width / 2}px, ${b.top + b.height * 0.6 - a.top - a.height / 2}px) scale(.3)`, opacity: .6 }],
+    { duration: 450, easing: 'ease-in' }).finished.catch(() => {}).then(() => fly.remove());
+  setTimeout(() => setCat('pang', f.mood, f.anim, $('.feed')), 400);
+  bubble(f.pre ? `${f.pre}${w}！` : `${w}！${f.post}`);
+  seq([400, ...(f.pre ? [...narrate({ t: f.pre, ...PANG }), () => sayPangWord(w)] : [() => sayPangWord(w), 100, ...narrate({ t: f.post, ...PANG })])]);
 }
 
 /* ============ learn: all symbols (闖關地圖 or the plain grid) ============ */
@@ -781,9 +856,9 @@ function renderSort() {
 }
 
 // Pointer Events cover mouse, touch and pen. Dropped on a `sel` element -> onDrop(el);
-// a tap without moving -> onTap (if any); anywhere else it springs back.
+// a tap without moving -> onTap (if any); anywhere else it springs back (then onMiss(dx, dy), if any).
 const dropAt = (ev, sel) => document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest(sel)).find(Boolean);
-function dragCard(card, sel, onDrop, onTap) {
+function dragCard(card, sel, onDrop, onTap, onMiss) {
   card.addEventListener('pointerdown', e => {
     if (e.button > 0 || card.disabled || card.classList.contains('gone')) return;
     card._dragged = false;
@@ -807,7 +882,9 @@ function dragCard(card, sel, onDrop, onTap) {
       card._dragged = true;   // the click that follows a drag isn't a tap
       const b = ev.type === 'pointerup' && dropAt(ev, sel);
       if (b && !b.disabled) return onDrop(b);
+      const dx = card._dx, dy = card._dy;
       card.style.transform = ''; card._dx = card._dy = 0;
+      if (ev.type === 'pointerup') onMiss?.(dx, dy);
     };
     card.addEventListener('pointermove', move); card.addEventListener('pointerup', up); card.addEventListener('pointercancel', up);
   });
@@ -1749,6 +1826,6 @@ function settings() {
     return { w, p, parts: sylParts(p), tone: TONE_MARK[p.t] };
   });
   unlockStickers();   // older saves: hand out stickers for symbols learned before the book existed
-  document.body.insertAdjacentHTML('beforeend', CAT_DEFS);
+  document.body.insertAdjacentHTML('beforeend', CAT_DEFS());
   route();
 })();

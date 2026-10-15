@@ -280,14 +280,26 @@ img { display: block; max-width: 100%; }
 .cal-g i.today { border-radius: 12px; box-shadow: 0 0 0 2px var(--orange) inset; color: var(--ink); font-weight: 700; }
 
 /* ---------- sticker book ---------- */
-.stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.stk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .stk {
   position: relative; background: var(--paper); border: 3px solid transparent; border-radius: 18px; box-shadow: var(--shadow);
   padding: 8px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
-.stk img { width: 100%; max-width: 72px; aspect-ratio: 1; object-fit: contain; }
+.stk { touch-action: none; }   /* a sticker can be dragged to 胖胖 on a touch screen too */
+.stk img { width: 100%; max-width: 110px; aspect-ratio: 1; object-fit: contain; pointer-events: none; }
 .stk .cap .zw { font-size: 17px; }
 .stk .cap .zy { font-size: 11px; }
+/* 3-4 character words (冰淇淋, 珍珠奶茶): one line at full size when the card is wide enough,
+   otherwise two characters per line, a bit smaller (the card's own width decides: container query) */
+.stk { container-type: inline-size; }
+@container (max-width: 150px) {
+  .cap.n3 .zw { display: inline-grid; grid-template-columns: repeat(2, auto); justify-content: center; font-size: 15px; row-gap: 2px; }
+  .cap.n3 .zy { font-size: 10px; padding-right: 7px; }
+}
+@container (max-width: 200px) {
+  .cap.n4 .zw { display: inline-grid; grid-template-columns: repeat(2, auto); justify-content: center; font-size: 15px; row-gap: 2px; }
+  .cap.n4 .zy { font-size: 10px; padding-right: 7px; }
+}
 .stk.speaking { border-color: var(--yellow); animation: pulse .5s ease; }
 .stk.lock { background: #F6EFE2; box-shadow: none; }
 .stk.lock img { filter: brightness(0) opacity(.13); }
@@ -580,3 +592,65 @@ img { display: block; max-width: 100%; }
   .award, .award * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cat * { animation: none !important; }
 }
+
+/* 貼紙簿: 胖胖 above the book; stickers fly into him */
+.feed { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.feed .cat { width: 68px; flex: none; }
+.feed .bubble { flex: 1; font-size: 17px; }
+.feed .cat.over { filter: drop-shadow(0 0 10px var(--yellow)); }
+.stk.drag { z-index: 6; position: relative; }
+.fly { position: fixed; z-index: 50; pointer-events: none; object-fit: contain; }
+.cat.chew { animation: chew .9s ease; }
+.cat.sway { animation: sway 1.2s ease-in-out; }
+@keyframes chew { 15%, 45%, 75% { transform: scaleY(.92) scaleX(1.04); } 30%, 60%, 90% { transform: none; } }
+@keyframes sway { 25% { transform: translateX(-8px) rotate(-5deg); } 75% { transform: translateX(8px) rotate(5deg); } }
+
+/* 貼紙簿 as a book: category tabs, one page at a time, ‹ › to turn */
+.bar .stk-count { font-size: 15px; color: var(--ink-soft); }
+.stk-tabs { display: flex; justify-content: center; gap: 4px; margin: 0 0 8px; }
+.stk-tab { width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--paper); box-shadow: var(--shadow); font-size: 18px; padding: 0; }
+.stk-tab[aria-selected="true"] { background: var(--yellow); }
+/* the book: cloth cover edge with stitching, ring binding on the left, dotted paper */
+.stk-book {
+  --cover: #4F8FBF;
+  position: relative; min-height: 470px; padding: 6px 12px 14px 30px; overflow: hidden; touch-action: pan-y;
+  border: 9px solid var(--cover); border-radius: 10px 22px 22px 10px;
+  outline: 2px dashed rgba(255, 255, 255, .6); outline-offset: -5px;
+  background: radial-gradient(#E9DDC6 1.2px, transparent 1.6px) 0 0 / 18px 18px, #FFFDF6;
+  box-shadow: inset 14px 0 14px -12px rgba(31, 42, 68, .35), 0 6px 0 #3B6E95, 0 12px 24px rgba(31, 42, 68, .18);
+}
+/* the book clips the sliding page while turning, but a sticker being dragged to 胖胖 must leave it */
+.stk-book:has(.stk.drag) { overflow: visible; }
+.stk.drag { z-index: 20; }
+.stk-book::before {   /* binding rings */
+  content: ""; position: absolute; left: 6px; top: 14px; bottom: 14px; width: 14px; z-index: 1; pointer-events: none;
+  background: radial-gradient(circle at 7px 7px, #fff 0 3px, #8D99AE 3.5px 6.5px, transparent 7px) 0 0 / 14px 46px repeat-y;
+}
+.stk-book .group-h {   /* category name on a strip of washi tape */
+  display: inline-flex; margin: 10px 0 10px 4px; padding: 2px 16px; transform: rotate(-2deg);
+  background: repeating-linear-gradient(45deg, rgba(255, 201, 60, .55) 0 8px, rgba(255, 201, 60, .35) 8px 16px);
+  clip-path: polygon(0 8%, 4% 0, 96% 6%, 100% 0, 99% 92%, 95% 100%, 5% 94%, 1% 100%);
+}
+/* stickers sit on the page itself: no card, a little crooked, a soft shadow under the die-cut edge */
+.stk-book .stk { background: none; box-shadow: none; border: 0; padding: 4px 2px; }
+.stk-book .stk img { transform: rotate(var(--tilt, 0deg)); filter: drop-shadow(0 3px 2px rgba(31, 42, 68, .25)); transition: transform .15s; }
+.stk-book .stk:active img { transform: rotate(var(--tilt, 0deg)) scale(1.06); }
+.stk-book .stk.speaking { border: 0; }
+/* not collected yet: an empty spot with a dashed outline and the faint shape */
+.stk-book .stk.lock { background: rgba(233, 221, 198, .35); border: 2px dashed #DCC9A6; border-radius: 18px; }
+.stk-book .stk.lock img { filter: brightness(0) opacity(.13); transform: none; }
+.stk-page.in-r { animation: page-r .35s ease; }
+.stk-page.in-l { animation: page-l .35s ease; }
+@keyframes page-r { from { transform: translateX(40%) rotateY(-25deg); opacity: 0; } }
+@keyframes page-l { from { transform: translateX(-40%) rotateY(25deg); opacity: 0; } }
+.stk-nav { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 6px; color: var(--ink-soft); }
+.stk-nav .icon-btn { width: 52px; height: 52px; font-size: 30px; }
+@media (min-width: 560px) { .stk-book { min-height: 560px; } }
+/* wide cards (tablet / desktop): bigger picture and bigger words */
+@container (min-width: 180px) {
+  .stk .cap .zw { font-size: 26px; }
+  .stk .cap .zy { font-size: 15px; }
+  .stk .cap .zy .tn { font-size: 14px; }
+}
+.stk img { max-width: min(110px, 100%); }
+@media (min-width: 700px) { .stk img { max-width: 150px; } }
