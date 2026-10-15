@@ -102,6 +102,24 @@ py tools/split_tts.py work/tts/script.txt   （→ word/*.mp3 和 work/tts/revie
   再把那幾行另存一份 txt 跑 `gemini_tts.py`、`split_tts.py`，只會覆蓋那幾個檔。之後全部重產也會自動帶上提示。
 - 段數切不對時 `split_tts.py` 會停下來、不寫檔，改用 `build_tts_script.py --parts 3` 分批。
 
+`assets/audio/zh/pang/`、`assets/audio/zh/fei/`：胖胖、菲菲的台詞（Gemini TTS，2026-10-15；胖胖 voice `Puck`、
+菲菲 voice `Tari`，角色 style 見 `tools/gemini_tts.py` 的 `STYLES`）。檔名是台詞**去掉標點**後的碼位（嗨！我是胖胖。= `55e8-6211-662f-80d6-80d6.mp3`）。
+台詞清單在 `tools/cat_pang.txt`、`tools/cat_fei.txt`，必須跟 `app.js` 裡 `{ t: '…', ...PANG }`／`...FEI` 的句子一致；
+沒有錄音的句子會用裝置語音念，瀏覽器 console 會出現 `no recording for`。
+台詞不能帶變動的數字或詞：要嘛改成固定句（數字留在畫面上），要嘛拆成固定片段＋符號／詞錄音（「先認識」＋ㄅ＋「還有」＋ㄆ）。
+
+新增或改台詞（各 1 次 API 呼叫；只放要重念的幾行也可以）：
+
+```
+copy tools\cat_fei.txt work\tts\
+py tools/gemini_tts.py work/tts/cat_fei.txt --style fei --voice Tari
+py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei
+```
+
+- 胖胖用 `--style pang --voice Puck`、輸出 `assets/audio/zh/pang`。
+- 一個字的台詞（胖！、菲。）Gemini 容易念兩次，句中的逗號也可能被切成兩段，段數剛好對上時 `split_tts.py` 不會發現。
+  每句的秒數要對照字數看，對不上就要手動切。
+
 `assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（ㄇㄠ = `3107-3120.mp3`）：範例詞用到的單音節（輕聲除外），
 來源 [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（錄音者 Chen Wang，README 標示 CC BY-SA，版本未載明）。
 **目前沒有程式播放**（範例詞改用 `word/`），保留給 P2 拼拼看、抓錯遊戲評估（見 ROADMAP 0.1）。重新下載：

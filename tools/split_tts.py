@@ -3,6 +3,7 @@
 Usage:
   py tools/split_tts.py work/tts/script.txt     (reads work/tts/script.wav next to it)
   py tools/split_tts.py work/tts/test.txt --out work/tts/test   (clips elsewhere, e.g. to try something out)
+  py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei   (cat lines, see tools/cat_fei.txt)
 
 Finds the pauses with ffmpeg silencedetect, trying several thresholds until the number of
 speech segments equals the number of words; the n-th segment is the n-th line of the script.
@@ -30,8 +31,11 @@ MIN_SPEECH = 0.08                         # shorter blips (clicks, breaths) are 
 PAD = (0.05, 0.12)                        # keep a little before / after each segment
 
 
+PUNCT = re.compile(r'[\s，。！？、：；～「」,.!?:;~]')   # not part of the name; same as LINE_PUNCT in app.js
+
+
 def file_name(word):
-    return '-'.join(f'{ord(c):x}' for c in word) + '.mp3'
+    return '-'.join(f'{ord(c):x}' for c in PUNCT.sub('', word)) + '.mp3'
 
 
 def segments(src, total, noise, dur):

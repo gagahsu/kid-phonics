@@ -52,7 +52,8 @@
 | 單音節（未採用） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ✕ 全程低頻嗡嗡聲＋人聲很小 |
 | 單音節（未採用，可再評估） | 教育部《國語辭典簡編本》單字屬性聲音檔 `dict_concised_music_word_2014_20260929.zip`（1.5 GB，可用 HTTP Range 只抓需要的檔） | **CC BY-ND 3.0 TW**（禁止改作） | 標示出處；不可改音量／降噪，只能擷取片段、播放時以 Web Audio 增益 | ✕ 每檔約 9 秒念「字、部首、筆畫、拼讀」，需切段；音量小且不一致。結尾的「ㄅ、ㄚ、ㄅㄚˇ」拼讀可供 2.2 拼拼看參考 |
 | 範例詞（154 個，含單字詞） | Gemini TTS（`gemini-3.8-flash-tts`，voice Lora），見 README「錄音」 | Gemini API 使用條款 | 站內自願標示為 AI 語音合成 | ☑ 已上線（2026-10-15） |
-| 句子、貓咪說話 | 裝置內建 TTS | — | — | ☑ |
+| 胖胖、菲菲台詞（43 句） | Gemini TTS（胖胖 voice Puck、菲菲 voice Tari），見 README「錄音」 | Gemini API 使用條款 | 站內自願標示為 AI 語音合成 | ☑（2026-10-15） |
+| 家長設定的試聽、錄音播不出來時 | 裝置內建 TTS | — | — | ☑ |
 
 - 符號維持教育部錄音（2026-10-15 試過 Gemini TTS 念 8 個難的符號 ㄅㄈㄓㄖㄜㄝㄥㄦ：16 項只念出 8 段、念法不對，不採用）。與詞卡（Gemini）音色不同，先接受；音量已對齊（+4.3 dB）。
 - 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
@@ -292,7 +293,7 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
 - 菲菲表情：`calm`（預設瞇眼）、`smile`、`nod`（點頭）、`yawn`（休息提醒）。
 - 動畫：`hop`（答對跳一下）、`wobble`（答錯晃一下）、`dance`（結算）、尾巴擺動。尊重 `prefers-reduced-motion`。
 
-**聲音**：台詞用 TTS 調 `pitch` 區分角色（胖胖較高 ~1.35，菲菲接近原音 ~1.0、語速稍慢），不需要另外錄音。
+**聲音**：台詞用 Gemini TTS 預錄（2026-10-15）：胖胖 voice Puck、菲菲 voice Tari，各有角色 style。播不出來時才用裝置 TTS 調 `pitch` 區分（胖胖 1.4、菲菲 1.05）。台詞要是固定句，數字只顯示在畫面上。
 
 **互動**
 - 題目區改成「貓＋對話氣泡」：題目說明、鼓勵由菲菲說；被抓錯、求教由胖胖說（取代純文字 `fb`）。

@@ -129,7 +129,7 @@ async function seq(steps) {
     if (!st) continue;
     if (typeof st === 'number') await sleep(st);
     else if (typeof st === 'function') await st();
-    else await speak(st.t, st);
+    else await (st.who ? sayLine(st) : speak(st.t, st));
   }
   return id === seqId;
 }
@@ -148,9 +148,19 @@ async function sayWord(w) {
   if (await playClip(wordUrl(w)) === false) await speak(w);
 }
 const narrate = (...steps) => S.settings.narrate ? steps : [];
-// character voices (TTS pitch): 胖胖 is the excitable one, 菲菲 the calm helper
-const PANG = { pitch: 1.4 };
-const FEI = { pitch: 1.05 };
+// 胖胖 / 菲菲 lines: Gemini TTS clips in assets/audio/zh/<who>/, named by the code points of the text
+// without punctuation (tools/cat_<who>.txt lists them). Device TTS at the cat's pitch if the clip fails —
+// so a line added to the code without a recording still works; console.warn shows which one.
+const lineUrl = (who, t) => `assets/audio/zh/${who}/${[...t.replace(LINE_PUNCT, '')].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
+const LINE_PUNCT = /[\s，。！？、：；～「」,.!?:;~]/g;   // keep in sync with tools/split_tts.py
+async function sayLine(st) {
+  if (HAS_TTS) speechSynthesis.cancel();
+  const r = await playClip(lineUrl(st.who, st.t));
+  if (r === false) { console.warn('no recording for', st.who, st.t); await speak(st.t, st); }
+}
+// character voices: 胖胖 (Gemini Puck) is the excitable one, 菲菲 (Tari) the calm helper; pitch is for the TTS fallback
+const PANG = { who: 'pang', pitch: 1.4 };
+const FEI = { who: 'fei', pitch: 1.05 };
 
 let actx;
 function tone(freqs, dur = 0.12, type = 'sine') {
@@ -354,7 +364,7 @@ function home() {
         : `<a href="#/sort" class="locked" data-act="lockSort"><span class="ico">🔒</span><span class="mt"><span class="t">分類籃</span><br><span class="s">先認識 ${sortHint().join(' 和 ')}，就能玩</span></span>${QUIET}</a>`}
       ${memLeft
         ? `<a href="#/memory" class="locked" data-act="lockMem"><span class="ico">🔒</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">再認識 ${memLeft} 個符號，就能玩</span></span>${QUIET}</a>`
-        : `<a href="#/memory"><span class="ico">🃏</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">翻開牌，找出符號和它的圖片</span></span>${QUIET}</a>`}
+        : `<a href="#/memory"><span class="ico">🃏</span><span class="mt"><span class="t">翻牌配對</span><br><span class="s">翻開牌，找出符號跟它的圖片</span></span>${QUIET}</a>`}
       ${spellLeft
         ? `<a href="#/spell" class="locked" data-act="lockSpell"><span class="ico">🔒</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">再學會 ${spellLeft} 個符號（★），就能玩</span></span>${SOFT}</a>`
         : `<a href="#/spell"><span class="ico">🛝</span><span class="mt"><span class="t">拼拼看</span><br><span class="s">注音溜滑梯，拼出一個字</span></span>${SOFT}</a>`}
@@ -369,7 +379,7 @@ function home() {
   ACT.hiPang = el => {
     bounce(el);
     seq([{ t: '嗨！我是胖胖。', ...PANG }, () => saySym('ㄆ'), 150, () => saySym('ㄤ'), 150, { t: '胖！', ...PANG },
-      { t: learned ? `我們已經學會${learned}個注音了！` : '我還不太會注音，你可以陪我練習嗎？', ...PANG }]);
+      { t: learned ? '謝謝你陪我練習！今天也一起學注音吧！' : '我還不太會注音，你可以陪我練習嗎？', ...PANG }]);
   };
   ACT.hiFei = el => {
     bounce(el);
@@ -378,10 +388,11 @@ function home() {
   };
   ACT.lockSort = () => {
     const [a, b] = sortHint();
-    seq([{ t: '先認識', ...FEI }, () => saySym(a), { t: '和', ...FEI }, () => saySym(b), { t: '，就能玩分類籃喔。', ...FEI }]);
+    seq([{ t: '先認識', ...FEI }, () => saySym(a), { t: '還有', ...FEI }, () => saySym(b), { t: '，就能玩分類籃喔。', ...FEI }]);
   };
-  ACT.lockMem = () => seq([{ t: `再認識${memLeft}個符號，就能玩翻牌喔。`, ...FEI }]);
-  ACT.lockSpell = () => seq([{ t: `再學會${spellLeft}個符號，就能玩拼拼看喔。`, ...FEI }]);
+  // the number is on screen; spoken lines stay fixed so they can be recorded
+  ACT.lockMem = () => seq([{ t: '再多認識幾個符號，就能玩翻牌喔。', ...FEI }]);
+  ACT.lockSpell = () => seq([{ t: '再多學會幾個符號，就能玩拼拼看喔。', ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -416,7 +427,7 @@ function stickers() {
   app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的貼紙簿</h2></div>
     <p class="legend">已收集 <b>${got}</b> / ${STICKERS.length} 張。注音符號學會了（★），它的貼紙就會跑進來。</p>
     ${sections}`;
-  ACT.stk = el => { flash(el); seq([{ t: el.dataset.w }]); };
+  ACT.stk = el => { flash(el); seq([() => sayWord(el.dataset.w)]); };
   ACT.stkLock = el => seq([{ t: '學會', ...FEI }, () => saySym(el.dataset.s), { t: '，就能拿到這張貼紙喔。', ...FEI }]);
 }
 
@@ -807,7 +818,7 @@ function renderMemory() {
   app.innerHTML = `
     <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a><span style="flex:1"></span></div>
     <div class="q">
-      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">找出符號和它的圖片！</div></div>
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">找出符號跟它的圖片！</div></div>
       <div class="mem">${G.cards.map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" aria-label="第 ${i + 1} 張牌">
         <span class="back">🐾</span>
         <span class="face${c.s ? ` sym g-${SYM[c.s].g}` : ''}">${c.s || img(c.w)}</span></button>`).join('')}</div>
@@ -816,7 +827,7 @@ function renderMemory() {
   ACT.quit = () => { G = null; go(''); };
   setTimeout(() => {
     if (G?.cfg.game !== 'memory' || G.tries || G.up.length || location.hash !== '#/memory') return;
-    seq(narrate({ t: '翻開兩張牌，找出符號和它的圖片！', ...FEI }));
+    seq(narrate({ t: '翻開兩張牌，找出符號跟它的圖片！', ...FEI }));
   }, 300);
 }
 
@@ -1083,7 +1094,7 @@ function renderDone() {
   seq([700, ...narrate(
     { t: '耶！', ...PANG }, { t: msg, ...FEI },
     firstToday && { t: '今天的練習完成了，蓋一個章！', ...FEI },
-    fresh.length && { t: '拿到新貼紙：' + fresh.join('、'), ...PANG },
+    fresh.length && { t: '拿到新貼紙了！', ...PANG }, ...fresh.flatMap(w => [() => sayWord(w), 150]),
     tired && { t: '菲菲想睡覺了，我們明天再玩吧。', ...FEI, rate: S.settings.rate * 0.85 },
   )]);
 }
@@ -1103,7 +1114,7 @@ function settings() {
       <label for="rate">速度：<b id="rateV">${S.settings.rate.toFixed(1)}</b></label>
       <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
       <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
-      <p class="note">這裡的語音用來念句子和貓咪說話。注音符號和範例詞播放錄音（見下方「聲音從哪裡來」）；錄音播不出來時，才用這個語音代替（例如 ㄅ 念代表字「玻」）。</p>
+      <p class="note">注音符號、範例詞和貓咪說話都播放錄音（見下方「聲音從哪裡來」）；這裡的語音只在錄音播不出來時代替（例如 ㄅ 念代表字「玻」）。</p>
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
@@ -1121,7 +1132,8 @@ function settings() {
         <a href="https://creativecommons.org/licenses/by/4.0/deed.zh_TW" target="_blank" rel="noopener">創用CC 姓名標示 4.0 國際版</a>授權使用
         （<a href="https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html" target="_blank" rel="noopener">原始出處</a>）；本站僅剪除尾端空白、調整音量。</p>
       <p class="note"><b>範例詞（貓、冰淇淋…）</b>：以 Google Gemini 語音合成（gemini-3.8-flash-tts）產生，本站剪除前後空白、調整音量。</p>
-      <p class="note"><b>句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
+      <p class="note"><b>胖胖、菲菲說話</b>：以 Google Gemini 語音合成（gemini-3.8-flash-tts）預先錄好。</p>
+      <p class="note"><b>錄音播不出來時</b>：改用這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
