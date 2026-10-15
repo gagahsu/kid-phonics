@@ -33,7 +33,8 @@ S.stickers ??= {};                     // picture slug -> unlocked at (ms); neve
 S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp}
 S.spell ??= {};                        // 'zh:貓' -> {ok, round}: 拼拼看 first-try spellings, one per round
 S.map ??= {};                          // 'zh:ㄅㄆ' -> 闖關地圖: that pair first beaten in a 大對決 at (ms)
-S.settings.learnView ??= 'map';        // 認識符號: 'map' (闖關地圖) | 'grid'
+S.settings.learnView ??= 'map';
+S.settings.kidName ??= '';             // printed on 獎狀        // 認識符號: 'map' (闖關地圖) | 'grid'
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
 const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
 function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
@@ -320,7 +321,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, teach: teachGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, teach: teachGame, award, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -1600,12 +1601,80 @@ function renderDone() {
   )]);
 }
 
+/* ============ for parents: report, 建議多練, 獎狀 ============ */
+const AWARDS = [['i', '聲母'], ['m', '介音'], ['f', '韻母']];
+// days with a stamp since Monday / since the 1st; the most-missed symbols and pair
+function report() {
+  const now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
+  const week = Object.keys(S.days).filter(k => k >= dayKey(mon)).length;
+  const month = Object.keys(S.days).filter(k => k.startsWith(dayKey().slice(0, 7))).length;
+  const learned = Z.symbols.filter(x => level(x.s) === 3).length;
+  const weak = Z.symbols.filter(x => stat(x.s).bad > 0).sort((a, b) => stat(b.s).bad - stat(a.s).bad).slice(0, 3).map(x => x.s);
+  const pair = PAIRS.map(p => [stat(p[0]).bad + stat(p[1]).bad, p]).filter(x => stat(x[1][0]).bad && stat(x[1][1]).bad)
+    .sort((a, b) => b[0] - a[0])[0]?.[1];
+  return `<div class="panel">
+    <h3>練習紀錄</h3>
+    <div class="stats">
+      <div><b>${week}</b><span>本週練習天數</span></div>
+      <div><b>${month}</b><span>${now.getMonth() + 1} 月練習天數</span></div>
+      <div><b>${learned}<small> / ${Z.symbols.length}</small></b><span>學會的符號</span></div>
+      <div><b>${STICKERS.filter(x => S.stickers[x.art]).length}<small> / ${STICKERS.length}</small></b><span>貼紙</span></div>
+    </div>
+    <p class="note">今天玩了 ${S.days[dayKey()]?.rounds || 0} 輪。最常搞混：${pair ? `<b>${pair.join('／')}</b>（可以玩分類籃練習）` : '還沒有'}</p>
+    <h3 class="sub">建議多練</h3>
+    ${weak.length ? `<div class="chips weak">${weak.map(s => `<a class="chip" href="#/practice/${s}">${s}<small>答錯 ${stat(s).bad} 次</small></a>`).join('')}</div>
+      <p class="note">答錯最多的符號。點一下，馬上練這個符號一輪。</p>` : '<p class="note">還沒有答錯過的符號。</p>'}
+  </div>`;
+}
+
+// #/award/i: printable certificate once every symbol of the group is learned
+function award(g) {
+  const a = AWARDS.find(x => x[0] === g), list = Z.symbols.filter(x => x.g === g);
+  if (!a || list.some(x => level(x.s) !== 3)) return go('settings');
+  const d = new Date(), name = S.settings.kidName;
+  app.innerHTML = `
+    <div class="bar no-print"><a class="icon-btn" href="#/settings" aria-label="回家長設定">←</a><h2>獎狀</h2>
+      <button class="btn primary" data-act="print">🖨️ 列印</button></div>
+    <p class="note no-print">列印預覽（A4 橫式）${name ? '' : '。到「家長設定」填孩子的名字，就會印在獎狀上'}</p>
+    <div class="paper-fit"><div class="paper"><article class="award">
+      <h1>獎　狀</h1>
+      <p class="who">${name ? `<b>${esc(name)}</b> 小朋友` : '<b class="blank"></b> 小朋友'}</p>
+      <p class="what">學會了全部 ${list.length} 個<b>${a[1]}</b>，<br>好棒！特頒此狀，以資鼓勵。</p>
+      <p class="syms">${list.map(x => `<span class="g-${g}">${x.s}</span>`).join('')}</p>
+      <div class="duo small">${catEl('pang', 'happy')}${catEl('fei', 'smile')}</div>
+      <p class="from">發音樂園　胖胖、菲菲 敬贈<br>${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日</p>
+    </article></div></div>`;
+  ACT.print = () => window.print();
+  fitPaper();
+}
+// the preview is a real-size A4 sheet (mm), shrunk to the screen width; printing drops the scale
+function fitPaper() {
+  const fit = $('.paper-fit'), paper = $('.paper');
+  if (!fit) return;
+  const k = Math.min(1, fit.clientWidth / paper.offsetWidth);
+  paper.style.transform = `scale(${k})`;
+  fit.style.height = `${paper.offsetHeight * k}px`;
+}
+window.addEventListener('resize', fitPaper);
+
 /* ============ settings (for parents) ============ */
 function settings() {
   const zh = zhVoices();
   const cur = voiceFor();
   app.innerHTML = `
     <div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>家長設定</h2></div>
+    <div class="panel tips">
+      <h3>怎麼陪孩子練習</h3>
+      <ul>
+        <li>每天 5–10 分鐘就好。一輪 5 題，玩一兩輪就停，比一次練很久有效。</li>
+        <li>先玩標著「🤫 不用開口」的遊戲，讓孩子覺得「我會」；熟了再玩「📣 要開口」的。</li>
+        <li>孩子念錯時說「差一點點，再一次」，少說「不對」。</li>
+        <li>「教胖胖」不會錄音：請坐在旁邊當聽眾。不管對不對，先說「有念出來就很棒」。</li>
+        <li>有空時換你當胖胖：故意念錯，讓孩子來抓。</li>
+        <li>紀錄只存在這台裝置的瀏覽器，換裝置或清除瀏覽資料就會重來。</li>
+      </ul>
+    </div>
+    ${report()}
     ${!HAS_TTS ? '<div class="warn">這個瀏覽器不支援語音朗讀，請改用 Chrome、Safari 或 Edge。</div>'
       : !zh.length ? '<div class="warn">找不到中文語音。Android 請到「設定 → 文字轉語音」安裝 Google 中文（台灣）語音；Windows 請在「語言」加入中文（台灣）。</div>' : ''}
     <div class="panel">
@@ -1625,12 +1694,19 @@ function settings() {
       <p class="note">泡泡往上飄、大對決輸送帶跑的速度。孩子常常來不及點，就調慢一點。</p>
     </div>
     <div class="panel">
-      <h3>練習紀錄</h3>
-      <p class="note">已學會 ${Z.symbols.filter(x => level(x.s) === 3).length} 個・貼紙 ${STICKERS.filter(x => S.stickers[x.art]).length} / ${STICKERS.length} 張・
-        這個月練習 ${Object.keys(S.days).filter(k => k.startsWith(dayKey().slice(0, 7))).length} 天・今天 ${S.days[dayKey()]?.rounds || 0} 輪</p>
-      <p class="note">答錯最多：${
-        Z.symbols.filter(x => stat(x.s).bad > 0).sort((a, b) => stat(b.s).bad - stat(a.s).bad).slice(0, 6).map(x => `${x.s}（${stat(x.s).bad}）`).join('、') || '還沒有'}</p>
-      <p class="note">紀錄只存在這台裝置的瀏覽器裡，換裝置或清除瀏覽資料就會重來。</p>
+      <h3>獎狀</h3>
+      <label for="kidName">孩子的名字（印在獎狀上）</label>
+      <input id="kidName" type="text" maxlength="12" value="${esc(S.settings.kidName)}" placeholder="例如：小安" autocomplete="off">
+      <ul class="awards">${AWARDS.map(([g, name]) => {
+        const list = Z.symbols.filter(x => x.g === g), got = list.filter(x => level(x.s) === 3).length;
+        return `<li>${name}（${list.length} 個）：${got === list.length
+          ? `<a href="#/award/${g}">🏅 看獎狀、列印</a>` : `學會 ${got} 個，還差 ${list.length - got} 個`}</li>`;
+      }).join('')}</ul>
+      <p class="note">每一組的符號全部學會（★）就有一張獎狀，可以列印出來。</p>
+    </div>
+    <div class="panel">
+      <h3>清除紀錄</h3>
+      <p class="note">熟練度、貼紙、印章、地圖過關都會清掉，無法復原。</p>
       <div class="btn-row"><button class="btn" data-act="reset">清除紀錄</button></div>
     </div>
     <div class="panel">
@@ -1643,11 +1719,12 @@ function settings() {
       <p class="note"><b>錄音播不出來時</b>：改用這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
+  $('#kidName').oninput = e => { S.settings.kidName = e.target.value.trim(); save(); };
   ACT.bubSpeed = el => { S.settings.bubbles = el.dataset.k; save(); app.querySelectorAll('[data-act=bubSpeed]').forEach(b => b.setAttribute('aria-pressed', b === el)); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
   $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rateV').textContent = S.settings.rate.toFixed(1); save(); };
   ACT.test = () => seq([() => saySym('ㄅ'), 250, { t: '爸爸，杯子，包子。' }]);
-  ACT.reset = () => { if (confirm('確定要清除所有練習紀錄（熟練度、貼紙、印章）嗎？')) { S.stats = {}; S.stickers = {}; S.days = {}; save(); settings(); } };
+  ACT.reset = () => { if (confirm('確定要清除所有練習紀錄（熟練度、貼紙、印章）嗎？')) { S.stats = {}; S.stickers = {}; S.days = {}; S.spell = {}; S.map = {}; save(); settings(); } };
 }
 
 /* ============ boot ============ */
