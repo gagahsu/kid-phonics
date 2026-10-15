@@ -446,3 +446,12 @@ img { display: block; max-width: 100%; }
 @media (min-width: 560px) {
   .opts { grid-template-columns: repeat(4, minmax(0, 150px)); }
 }
+
+/* 抓錯遊戲: ○ / ✕ verdict buttons, and what 胖胖 said once it's settled */
+.opts.verdict { grid-template-columns: repeat(2, minmax(0, 150px)); }
+.opt .mk { display: block; font-size: 64px; line-height: 1.1; }
+.opt .mk.ok { color: var(--good); }
+.opt .mk.no { color: var(--oops); }
+.verdict .opt { font-size: 24px; }
+.heard { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; color: var(--ink); }
+.heard img { width: 56px; height: 56px; object-fit: contain; }

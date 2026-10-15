@@ -148,6 +148,11 @@ async function sayWord(w) {
   if (HAS_TTS) speechSynthesis.cancel();
   if (await playClip(wordUrl(w)) === false) await speak(w);
 }
+// 抓錯遊戲: the words 胖胖 reads, in his own voice (Gemini Puck); the example-word clip if one is missing
+async function sayPangWord(w) {
+  if (HAS_TTS) speechSynthesis.cancel();
+  if (await playClip(wordUrl(w).replace('/word/', '/pang-word/')) === false) await sayWord(w);
+}
 const narrate = (...steps) => S.settings.narrate ? steps : [];
 // 胖胖 / 菲菲 lines: Gemini TTS clips in assets/audio/zh/<who>/, named by the code points of the text
 // without punctuation (tools/cat_<who>.txt lists them). Device TTS at the cat's pitch if the clip fails —
@@ -307,7 +312,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -332,7 +337,7 @@ function home() {
   const today = S.days[dayKey()];
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
   const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned),
-    bubLeft = Math.max(0, BUB_MIN - learned);
+    bubLeft = Math.max(0, BUB_MIN - learned), catchLeft = Math.max(0, CATCH_MIN - learned);
   const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
@@ -373,6 +378,9 @@ function home() {
       ${bubLeft
         ? `<a href="#/bubbles" class="locked" data-act="lockBub"><span class="ico">🔒</span><span class="mt"><span class="t">泡泡</span><br><span class="s">再學會 ${bubLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
         : `<a href="#/bubbles"><span class="ico">🫧</span><span class="mt"><span class="t">泡泡</span><br><span class="s">聽聲音，戳破對的泡泡，複習學會的符號</span></span>${QUIET}</a>`}
+      ${catchLeft
+        ? `<a href="#/catch" class="locked" data-act="lockCatch"><span class="ico">🔒</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">再學會 ${catchLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
+        : `<a href="#/catch"><span class="ico">🔍</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">胖胖念對了嗎？抓出念錯的地方</span></span>${QUIET}</a>`}
     </nav>
     ${calendar()}
     <div class="progress">
@@ -399,6 +407,7 @@ function home() {
   ACT.lockMem = () => seq([{ t: '再多認識幾個符號，就能玩翻牌喔。', ...FEI }]);
   ACT.lockSpell = () => seq([{ t: '再多學會幾個符號，就能玩拼拼看喔。', ...FEI }]);
   ACT.lockBub = () => seq([{ t: '再多學會幾個符號，就能玩泡泡喔。', ...FEI }]);
+  ACT.lockCatch = () => seq([{ t: '再多學會幾個符號，就能玩抓錯遊戲喔。', ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -1151,6 +1160,109 @@ async function bubPop(q, b) {
   const g = G;
   await Promise.all([sleep(1100), seq([200, () => saySym(q.t), 150, ...narrate({ t: praise, ...FEI })])]);
   if (G === g && G.qs[G.k] === q && location.hash === '#/bubbles') { G.k++; renderBubbles(); }
+}
+
+/* ============ game: 抓錯遊戲 (胖胖 reads a word — right, or as a near-miss; the child judges) ============ */
+// One-character words with a near-miss partner (貓 -> 馬 / 草 / 門). 胖胖's "reading" is that word's
+// recording, so a wrong reading is a real, reviewed word — no new syllable audio needed.
+const CATCH_MIN = 8;    // learned symbols before it unlocks
+
+function catchGame() {
+  if (Z.symbols.filter(x => level(x.s) === 3).length < CATCH_MIN) return go('');
+  const seen = new Set(seenSyms());
+  const score = o => o.parts.reduce((a, s) => a + weight(s), 0) / o.parts.length - o.parts.filter(s => !seen.has(s)).length * 10;
+  const picked = [];
+  for (const o of ONE.filter(o => near(o, ONE).length).map(o => [score(o), o]).sort((a, b) => b[0] - a[0]).map(x => x[1]))
+    if (picked.length < ROUND && !picked.some(x => sylKey(x.p) === sylKey(o.p))) picked.push(o);
+  // at least 2 right and 2 wrong readings in a round
+  const right = shuffle([true, true, false, false, Math.random() < 0.5]);
+  const qs = shuffle(picked).map((o, k) => ({ ...o, right: right[k], heard: right[k] ? o.w : pick(near(o, ONE)).w }));
+  G = { cfg: { game: 'catch' }, qs, k: 0, results: [], over: false, told: {}, newStickers: [] };
+  renderCatch();
+}
+
+function renderCatch() {
+  if (G.k >= G.qs.length) return renderDone();
+  const q = G.qs[G.k];
+  q.tries = 0; q.locked = false;
+  app.innerHTML = `
+    ${roundBar()}
+    <div class="q">
+      <div class="ask">${catEl('pang', 'talk')}<div class="bubble" id="bubble">胖胖念對了嗎？</div>
+        <button class="play small" data-act="replay" aria-label="再聽一次">🔊</button></div>
+      <div class="q-prompt"><div class="q-pic">${img(q.w)}${ruby(q.w)}</div></div>
+      <div class="opts verdict">
+        <button class="opt" data-act="judge" data-v="1" aria-label="念對了"><b class="mk ok">○</b>念對了</button>
+        <button class="opt" data-act="judge" data-v="0" aria-label="念錯了"><b class="mk no">✕</b>念錯了</button>
+      </div>
+      <div class="fb" id="fb"></div>
+      <div id="next"></div>
+    </div>`;
+  const reading = (again = false) => [{ t: again ? '我再念一次。' : '我念念看。', ...PANG }, 150, () => sayPangWord(q.heard)];
+  ACT.quit = () => { G = null; go(''); };
+  ACT.next = () => { hush(); G.k++; renderCatch(); };
+  ACT.replay = el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); seq([() => sayPangWord(q.heard)]); };
+  ACT.judge = el => catchJudge(q, el, reading);
+  const intro = !G.told.c;
+  G.told.c = true;
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || q.locked || q.tries || location.hash !== '#/catch') return;
+    seq([...(intro ? narrate({ t: '胖胖會念念看。念對了按圈圈，念錯了按叉叉。', ...FEI }, 200) : []), ...reading()]);
+  }, 300);
+}
+
+// what 胖胖 said, shown under the question once it's settled
+const heardEl = q => `<span class="heard">胖胖念成${img(q.heard)}${ruby(q.heard)}</span>`;
+
+async function catchJudge(q, el, reading) {
+  if (q.locked || el.disabled) return;
+  if ((el.dataset.v === '1') === q.right) {
+    q.locked = true;
+    const firstTry = q.tries === 0;
+    G.results[G.k] = firstTry;
+    // a right reading is a 50/50 guess; only a caught mistake says the child heard the difference
+    if (!q.right) catchRecord(q, firstTry);
+    el.classList.add('right'); ding();
+    lockAll(); showNext();
+    if (q.right) {
+      bubble('耶，我念對了！'); setCat('pang', 'happy', 'hop');
+      seq([300, ...narrate({ t: '耶，我念對了！', ...PANG }), () => sayPangWord(q.w)]);
+    } else {
+      // 3.5 教胖胖 will ask the child to say it instead
+      bubble('被你抓到了！'); setCat('pang', 'oh', 'hop');
+      $('#fb').innerHTML = heardEl(q);
+      seq([300, { t: '被你抓到了！那要怎麼念？', ...PANG }, 200, ...narrate({ t: '對的是', ...FEI }), () => sayWord(q.w)]);
+    }
+    return;
+  }
+  q.tries++;
+  el.classList.add('wrong'); boop();
+  if (q.tries >= 2) {
+    q.locked = true;
+    G.results[G.k] = false;
+    if (!q.right) catchRecord(q, false);
+    app.querySelector(`.opt[data-v="${q.right ? 1 : 0}"]`).classList.add('reveal');
+    lockAll(); showNext();
+    setCat('pang', 'think', 'wobble');
+    if (q.right) {
+      bubble('胖胖念對了喔！');
+      seq([300, ...narrate({ t: '胖胖念對了喔', ...FEI }), () => sayWord(q.w)]);
+    } else {
+      bubble('胖胖念錯了喔！');
+      $('#fb').innerHTML = heardEl(q);
+      seq([300, ...narrate({ t: '胖胖剛剛念成', ...FEI }), () => sayPangWord(q.heard), 300, ...narrate({ t: '對的是', ...FEI }), () => sayWord(q.w)]);
+    }
+  } else {
+    el.disabled = true;
+    bubble('再聽聽看～'); setCat('pang', 'talk', 'wobble');
+    seq([350, ...narrate({ t: '再聽聽看', ...FEI }, 150), ...reading(true)]);
+  }
+}
+// the symbols 胖胖 got wrong (貓 ㄇㄠ read as 馬 ㄇㄚ -> ㄠ); none when the target's are all in it (尺 -> 船)
+function catchRecord(q, firstTry) {
+  const heard = ONE.find(o => o.w === q.heard).parts;
+  for (const s of q.parts) if (!heard.includes(s)) record(s, firstTry);
+  G.newStickers.push(...unlockStickers());
 }
 
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
