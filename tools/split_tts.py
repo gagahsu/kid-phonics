@@ -2,6 +2,7 @@
 
 Usage:
   py tools/split_tts.py work/tts/script.txt     (reads work/tts/script.wav next to it)
+  py tools/split_tts.py work/tts/test.txt --out work/tts/test   (clips elsewhere, e.g. to try something out)
 
 Finds the pauses with ffmpeg silencedetect, trying several thresholds until the number of
 speech segments equals the number of words; the n-th segment is the n-th line of the script.
@@ -48,9 +49,13 @@ def segments(src, total, noise, dur):
 
 
 def main():
-    if len(sys.argv) != 2:
+    args = sys.argv[1:]
+    out = OUT
+    if len(args) == 3 and args[1] == '--out':
+        out = os.path.join(ROOT, args[2])
+    elif len(args) != 1:
         sys.exit(__doc__)
-    script = sys.argv[1]
+    script = args[0]
     src = os.path.splitext(script)[0] + '.wav'
     words = [w.split('\t')[0].strip() for w in open(script, encoding='utf-8') if w.strip()]   # drop pronunciation hints
     with wave.open(src) as w:
@@ -71,10 +76,10 @@ def main():
                  'Listen to the wav for skipped / repeated words, or regenerate with --parts.')
     print(f'{len(words)} segments at {noise}dB / {dur}s silence')
 
-    os.makedirs(OUT, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
     rows = []
     for word, (a, b) in zip(words, segs):
-        dst = os.path.join(OUT, file_name(word))
+        dst = os.path.join(out, file_name(word))
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{max(0, a - PAD[0]):.3f}',
                         '-to', f'{min(total, b + PAD[1]):.3f}', '-i', src, '-af', FILTER,
                         '-ac', '1', '-ar', '44100', '-b:a', '64k', dst], check=True)
@@ -94,7 +99,7 @@ def main():
                     f'<td><audio controls preload="none" src="{rel}"></audio>')
         f.write('</table>')
     flagged = sum(r[3] for r in rows)
-    print(f'{len(rows)} clips -> {os.path.relpath(OUT, ROOT)}, {flagged} flagged. '
+    print(f'{len(rows)} clips -> {os.path.relpath(out, ROOT)}, {flagged} flagged. '
           f'Listen: {os.path.relpath(review, ROOT)}')
 
 

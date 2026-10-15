@@ -54,6 +54,7 @@
 | 範例詞（154 個，含單字詞） | Gemini TTS（`gemini-3.8-flash-tts`，voice Lora），見 README「錄音」 | Gemini API 使用條款 | 站內自願標示為 AI 語音合成 | ☑ 已上線（2026-10-15） |
 | 句子、貓咪說話 | 裝置內建 TTS | — | — | ☑ |
 
+- 符號維持教育部錄音（2026-10-15 試過 Gemini TTS 念 8 個難的符號 ㄅㄈㄓㄖㄜㄝㄥㄦ：16 項只念出 8 段、念法不對，不採用）。與詞卡（Gemini）音色不同，先接受；音量已對齊（+4.3 dB）。
 - 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
 - 單音節錄音：`tools/import_syllables.py` 依 `zhuyin.json` 用到的音節（輕聲除外，共 185 個）從 audio-cmn 下載轉檔，處理同符號錄音。原本用在單字詞，2026-10-15 起範例詞全部改用 Gemini TTS（`assets/audio/zh/word/`，`sayWord` → `wordUrl()`），`syl/` 目前沒有程式播放。P2 拼拼看、抓錯遊戲要用的單音節，做到時先用一小批音節試聽 Gemini（每個音節挑代表字＋讀音提示，聲調要逐一確認）再決定用 Gemini 還是 `syl/`；選 Gemini 就不再需要 audio-cmn。
 
