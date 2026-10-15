@@ -295,7 +295,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -344,6 +344,12 @@ function home() {
         ? `練習學過的 ${seenSyms().length} 個符號，一輪 ${ROUND} 題` : '先學幾個符號，再來練習'}</span></span>${QUIET}</a>
       <a href="#/stickers"><span class="ico">🎁</span><span class="mt"><span class="t">我的貼紙簿</span><br><span class="s">已收集 ${got} / ${STICKERS.length} 張</span></span></a>
     </nav>
+    <h3 class="group-h">遊戲</h3>
+    <nav class="menu games">
+      ${sortPairs().length
+        ? `<a href="#/sort"><span class="ico">🧺</span><span class="mt"><span class="t">分類籃</span><br><span class="s">把圖片放進對的籃子，分清楚很像的音</span></span>${QUIET}</a>`
+        : `<a href="#/sort" class="locked" data-act="lockSort"><span class="ico">🔒</span><span class="mt"><span class="t">分類籃</span><br><span class="s">先認識 ${sortHint().join(' 和 ')}，就能玩</span></span>${QUIET}</a>`}
+    </nav>
     ${calendar()}
     <div class="progress">
       <div class="row"><span>學會的符號（連續答對 3 次）</span><b>${learned} / ${Z.symbols.length}</b></div>
@@ -360,6 +366,10 @@ function home() {
     bounce(el);
     seq([{ t: '我是菲菲。', ...FEI }, () => saySym('ㄈ'), 150, () => saySym('ㄟ'), 150, { t: '菲。', ...FEI },
       { t: today ? '今天的章蓋好了，好棒。' : '每天玩一輪，就能蓋一個章喔。', ...FEI }]);
+  };
+  ACT.lockSort = () => {
+    const [a, b] = sortHint();
+    seq([{ t: '先認識', ...FEI }, () => saySym(a), { t: '和', ...FEI }, () => saySym(b), { t: '，就能玩分類籃喔。', ...FEI }]);
   };
 }
 
@@ -465,7 +475,7 @@ function practice(focus) {
     return;
   }
   if (focus && SYM[focus]) { markSeen(focus); return startRound({ mode: 'seen', focus }); }
-  if (G && !G.over) return renderQ();
+  if (G && !G.over && !G.cfg.game) return renderQ();
   const seen = seenSyms();
   if (poolMode === 'none') poolMode = 'seen';
   if (!seen.length && poolMode === 'seen') poolMode = 'none';
@@ -615,6 +625,135 @@ function showNext() {
   $('#next').innerHTML = `<button class="btn primary big" data-act="next">${last ? '看看拿了幾顆星 ⭐' : '下一題 →'}</button>`;
 }
 
+/* ============ game: 分類籃 (sort pictures into two baskets of easily-confused sounds) ============ */
+const SORT_N = 6;
+const PAIRS = CONFUSE.map(g => [...g].slice(0, 2));   // ㄐㄑㄒ plays as ㄐ / ㄑ
+const seenPair = p => p.filter(s => S.seen['zh:' + s]).length;
+const sortPairs = () => PAIRS.filter(p => seenPair(p) === 2);
+const sortHint = () => PAIRS.slice().sort((p, q) => seenPair(q) - seenPair(p))[0];   // closest to unlocking
+// only words whose first syllable has exactly one of the pair: for 聲母 that means "starts with",
+// for 介音 / 韻母 "contains" — a word with both would have no single right basket
+const firstSyl = w => Z.words[w].zy.split(' ')[0];
+
+function sortGame() {
+  const pairs = sortPairs();
+  if (!pairs.length) return go('');
+  // the pair the child misses most, with some randomness so it isn't always the same one
+  const [a, b] = pairs.map(p => [stat(p[0]).bad + stat(p[1]).bad + Math.random() * 2, p]).sort((x, y) => y[0] - x[0])[0][1];
+  const has = (w, s) => firstSyl(w).includes(s);
+  const words = Object.keys(Z.words).filter(w => has(w, a) !== has(w, b));
+  const A = shuffle(words.filter(w => has(w, a))), B = shuffle(words.filter(w => has(w, b)));
+  let na = Math.min(SORT_N / 2, A.length);
+  const nb = Math.min(SORT_N - na, B.length);
+  na = Math.min(SORT_N - nb, A.length);   // a short side (ㄦ has 2 words) is topped up from the other
+  const qs = shuffle([...A.slice(0, na).map(w => ({ w, t: a })), ...B.slice(0, nb).map(w => ({ w, t: b }))]);
+  G = { cfg: { game: 'sort' }, pair: [a, b], qs, k: 0, results: [], over: false, newStickers: [], pile: { [a]: [], [b]: [] } };
+  renderSort();
+}
+
+function renderSort() {
+  if (G.k >= G.qs.length) return renderDone();
+  const q = G.qs[G.k];
+  q.tries = 0; q.locked = false;
+  const dotsHtml = G.qs.map((_, i) => `<i class="${i < G.k ? (G.results[i] ? 'done' : 'miss') : i === G.k ? 'now' : ''}"></i>`).join('');
+  app.innerHTML = `
+    <div class="bar pbar"><a class="icon-btn" href="#/" data-act="quit" aria-label="離開">✕</a>
+      <span class="pdots" aria-label="第 ${G.k + 1} 張，共 ${G.qs.length} 張">${dotsHtml}</span><span style="width:46px"></span></div>
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">放進對的籃子！</div></div>
+      <div class="sort-stage"><button class="q-pic sort-card" aria-label="${esc(q.w)}，再聽一次">${img(q.w)}<span class="zw">${esc(q.w)}</span></button></div>
+      <div class="baskets">${G.pair.map(s => `<div class="bk">
+        <button class="basket g-${SYM[s].g}" data-act="drop" data-s="${s}" aria-label="${s} 的籃子"><b>${s}</b><span class="pile">${G.pile[s].map(w => img(w)).join('')}</span></button>
+        <button class="b-say" data-act="baskSay" data-s="${s}" aria-label="聽 ${s}">🔊</button></div>`).join('')}</div>
+      <p class="note">把圖片拖進籃子，或直接點籃子。</p>
+    </div>`;
+  const card = $('.sort-card');
+  dragCard(card, s => sortDrop(q, s), () => seq([() => sayWord(q.w)]));
+  ACT.drop = el => sortDrop(q, el.dataset.s);
+  ACT.baskSay = el => { const bk = el.previousElementSibling; flash(bk); seq([() => saySym(el.dataset.s)]); };
+  ACT.quit = () => { G = null; go(''); };
+  const sayBasket = s => () => { flash(app.querySelector(`.basket[data-s="${s}"]`)); return saySym(s); };
+  const intro = G.k === 0;
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || q.locked || q.tries || location.hash !== '#/sort') return;
+    seq([...(intro ? [...narrate({ t: '聽聽看，放進對的籃子。', ...FEI }, 150), sayBasket(G.pair[0]), 250, sayBasket(G.pair[1]), 400] : []),
+      () => sayWord(q.w)]);
+  }, 300);
+}
+
+// Pointer Events cover mouse, touch and pen; a tap without moving replays the word instead
+const basketAt = ev => document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest('.basket')).find(Boolean);
+function dragCard(card, onDrop, onTap) {
+  card.addEventListener('pointerdown', e => {
+    if (e.button > 0 || card.classList.contains('gone')) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    let moved = false;
+    card.setPointerCapture(e.pointerId);
+    card.classList.add('drag');
+    const move = ev => {
+      card._dx = ev.clientX - x0; card._dy = ev.clientY - y0;
+      if (!moved && Math.hypot(card._dx, card._dy) < 8) return;
+      moved = true;
+      card.style.transform = `translate(${card._dx}px, ${card._dy}px) scale(.85)`;
+      const over = basketAt(ev);
+      app.querySelectorAll('.basket').forEach(b => b.classList.toggle('over', b === over && !b.disabled));
+    };
+    const up = ev => {
+      card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', up); card.removeEventListener('pointercancel', up);
+      card.classList.remove('drag');
+      app.querySelectorAll('.basket.over').forEach(b => b.classList.remove('over'));
+      if (!moved) { card._dx = card._dy = 0; return onTap(); }
+      const b = ev.type === 'pointerup' && basketAt(ev);
+      if (b && !b.disabled) return onDrop(b.dataset.s);
+      card.style.transform = ''; card._dx = card._dy = 0;
+    };
+    card.addEventListener('pointermove', move); card.addEventListener('pointerup', up); card.addEventListener('pointercancel', up);
+  });
+}
+function flyTo(card, bk) {
+  const c = card.getBoundingClientRect(), b = bk.getBoundingClientRect();
+  const dx = (card._dx || 0) + b.left + b.width / 2 - (c.left + c.width / 2);
+  const dy = (card._dy || 0) + b.top + b.height / 2 - (c.top + c.height / 2);
+  card.style.transform = `translate(${dx}px, ${dy}px) scale(.25)`;
+  card.classList.add('gone');
+}
+
+// two baskets: a wrong drop disables that basket and the child puts the card in the other one
+// themselves (counts as not first try) — no ✗, no automatic answer
+async function sortDrop(q, s) {
+  if (q.locked) return;
+  const card = $('.sort-card'), bk = app.querySelector(`.basket[data-s="${s}"]`);
+  if (s !== q.t) {
+    q.tries++; boop();
+    bk.disabled = true; bk.classList.remove('no'); void bk.offsetWidth; bk.classList.add('no');
+    card.style.transform = ''; card._dx = card._dy = 0;
+    bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+    seq([350, ...narrate({ t: '再聽聽看', ...FEI }, 150), () => sayWord(q.w)]);
+    return;
+  }
+  q.locked = true;
+  const firstTry = q.tries === 0;
+  G.results[G.k] = firstTry;
+  record(q.t, firstTry);
+  G.newStickers.push(...unlockStickers());
+  ding(); flyTo(card, bk);
+  G.pile[q.t].push(q.w);
+  setTimeout(() => bk.querySelector('.pile')?.insertAdjacentHTML('beforeend', img(q.w)), 350);
+  let steps;
+  if (firstTry) {
+    const praise = pick(PRAISE);
+    bubble(praise); setCat('fei', 'smile', 'hop');
+    steps = [300, ...narrate({ t: praise, ...FEI })];
+  } else {
+    const how = SYM[q.t].g === 'i' ? '開頭是' : '裡面有';
+    bubble(`對了，「${q.w}」${how} ${q.t}`); setCat('fei', 'smile');
+    steps = [300, () => sayWord(q.w), 150, ...narrate({ t: how, ...FEI }), () => saySym(q.t), 200];
+  }
+  const g = G;
+  await Promise.all([sleep(1200), seq(steps)]);
+  if (G === g && G.qs[G.k] === q && location.hash === '#/sort') { G.k++; renderSort(); }
+}
+
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
   if (G.over) return;           // re-rendered by navigation: don't count the round twice
@@ -643,7 +782,7 @@ function renderDone() {
         <a class="btn ${tired ? 'primary ' : ''}big" href="#/">回首頁</a>
       </div>
     </div>`;
-  ACT.again = () => startRound(G.cfg);
+  ACT.again = () => G.cfg.game === 'sort' ? sortGame() : startRound(G.cfg);
   if (stars >= 3) setTimeout(() => tone([523, 659, 784, 1047], 0.16), 200);
   seq([700, ...narrate(
     { t: '耶！', ...PANG }, { t: msg, ...FEI },
