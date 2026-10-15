@@ -83,9 +83,27 @@ py tools/import_moe_audio.py 路徑/bopomofo_materials_20170213.zip
 
 錄音播不出來時，網站自動改用裝置語音念 `zhuyin.json` 的 `say` 代表字。
 
+`assets/audio/zh/word/<各字碼位以 - 連接>.mp3`（筆 = `7b46.mp3`、冰淇淋 = `51b0-6dc7-6dcb.mp3`）：
+全部 154 個範例詞（含單字詞、輕聲詞），用 Google Gemini TTS 產生（2026-10-15；模型 `gemini-3.8-flash-tts`，
+voice `Lora`，台灣國語、慢速的 style 提示見 `tools/gemini_tts.py`），整頁同一個聲音。播不出來時改用裝置語音念該詞。
+
+重新產生（需要 ffmpeg 和 Gemini API key；一次全部約 6 分鐘音訊、1 次 API 呼叫）：
+
+```
+copy .env.example .env          （填 GEMINI_API_KEY；model、voice 保持一致才會跟現有檔案同一個聲音）
+py tools/build_tts_script.py    （→ work/tts/script.txt）
+py tools/gemini_tts.py work/tts/script.txt
+py tools/split_tts.py work/tts/script.txt   （→ word/*.mp3 和 work/tts/review.html）
+```
+
+- **一定要用 `review.html` 逐一試聽**：同一個詞每次念的不一定一樣，常見錯誤是念成大陸讀音、單字詞聲調錯（雨→魚）。
+- 念錯的詞寫進 `tools/tts_hints.tsv`（`詞<TAB>拼音與說明`，只放進 style 提示、不會被念出來），
+  再把那幾行另存一份 txt 跑 `gemini_tts.py`、`split_tts.py`，只會覆蓋那幾個檔。之後全部重產也會自動帶上提示。
+- 段數切不對時 `split_tts.py` 會停下來、不寫檔，改用 `build_tts_script.py --parts 3` 分批。
+
 `assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（ㄇㄠ = `3107-3120.mp3`）：範例詞用到的單音節（輕聲除外），
 來源 [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（錄音者 Chen Wang，README 標示 CC BY-SA，版本未載明）。
-目前用在單字詞（貓、馬…），多字詞仍用裝置語音。**改了 `zhuyin.json` 的注音後要重跑**，補上新音節：
+**目前沒有程式播放**（範例詞改用 `word/`），保留給 P2 拼拼看、抓錯遊戲評估（見 ROADMAP 0.1）。重新下載：
 
 ```
 py tools/import_syllables.py
@@ -98,6 +116,8 @@ py tools/import_syllables.py
 康軒／翰林／南一都是教育部審定本，注音依教育部審訂音，三家差異主要在教學順序與呈現，讀音不會各自不同。
 
 **結果：154 詞中 142 詞與辭典正讀一致**（含所有「～子」、爸爸媽媽等疊字輕聲，以及葡萄、太陽、月亮、衣服、星星、西瓜、風箏）。
+
+2026-10-15：ㄩ 的「雨」改成「雨滴」ㄩˇ ㄉㄧ（「雨」和「魚」只差聲調，詞卡上聽起來太像），**尚未對照辭典**。
 
 2026-10-14 已依辭典修正：
 

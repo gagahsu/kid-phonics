@@ -7,6 +7,7 @@ Usage:
 Writes work/tts/script.txt (or script_1.txt ... script_N.txt): one word per line, in zhuyin.json
 order. The line order is the clip order: tools/gemini_tts.py reads the words with pauses between
 them, tools/split_tts.py cuts the audio on those pauses and names each clip after its line.
+Words in tools/tts_hints.tsv (word<TAB>hint) get their pronunciation hint after a tab.
 """
 import json
 import os
@@ -28,13 +29,15 @@ def main():
         sys.exit(__doc__)
     z = json.load(open(os.path.join(ROOT, 'data', 'zhuyin.json'), encoding='utf-8'))
     words = list(z['words'])
+    hints = dict(l.rstrip('\r\n').split('\t', 1)
+                 for l in open(os.path.join(ROOT, 'tools', 'tts_hints.tsv'), encoding='utf-8') if '\t' in l)
     os.makedirs(OUT, exist_ok=True)
     size = -(-len(words) // parts)
     for i in range(parts):
         chunk = words[i * size:(i + 1) * size]
         name = 'script.txt' if parts == 1 else f'script_{i + 1}.txt'
         with open(os.path.join(OUT, name), 'w', encoding='utf-8', newline='\n') as f:
-            f.write('\n'.join(chunk) + '\n')
+            f.write(''.join(w + (f'\t{hints[w]}' if w in hints else '') + '\n' for w in chunk))
         sec = sum(len(w) for w in chunk) * SEC_PER_CHAR + len(chunk) * PAUSE
         tokens = sec * TOKENS_PER_SEC
         warn = '  ** may exceed the output cap, use more --parts **' if tokens > MAX_TOKENS else ''

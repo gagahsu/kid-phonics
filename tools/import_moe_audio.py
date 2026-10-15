@@ -21,7 +21,10 @@ import zipfile
 ORDER = 'ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ'
 FILTER = ('silenceremove=start_periods=1:start_threshold=-45dB,areverse,'
           'silenceremove=start_periods=1:start_threshold=-45dB,areverse,'
-          'loudnorm=I=-16:TP=-1.5:LRA=7,adelay=30,apad=pad_dur=0.05')
+          'loudnorm=I=-16:TP=-1.5:LRA=7,'
+          # loudnorm under-reads clips this short; +4.3 dB matches the word/ clips (2026-10-15)
+          'volume=4.3dB,alimiter=limit=0.7:attack=0.5:release=20:level=false,'
+          'adelay=30,apad=pad_dur=0.05')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'audio', 'zh', 'sym')

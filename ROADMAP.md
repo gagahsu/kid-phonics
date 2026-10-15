@@ -18,7 +18,7 @@
 
 | 階段 | 項目 | 依賴 | 狀態 |
 |---|---|---|---|
-| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ◐ 37 符號、185 單音節已上線（單字詞使用）；多字詞仍 TTS，改 Gemini TTS 進行中 |
+| P0 | 0.1 真人錄音取代 TTS 代表字 | — | ☑ 37 符號真人錄音；154 個範例詞 Gemini TTS 錄音（2026-10-15）；185 單音節已下載、目前未使用 |
 | P0 | 0.2 排除粵語語音 | — | ☑ |
 | P1 | 1.1 指示語音化 | — | ☑ |
 | P1 | 1.2 貼紙簿 | — | ☑ |
@@ -51,10 +51,11 @@
 | 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ☑ 已上線（家長試聽後選用，2026-10-14）；授權版本仍待確認 |
 | 單音節（未採用） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ✕ 全程低頻嗡嗡聲＋人聲很小 |
 | 單音節（未採用，可再評估） | 教育部《國語辭典簡編本》單字屬性聲音檔 `dict_concised_music_word_2014_20260929.zip`（1.5 GB，可用 HTTP Range 只抓需要的檔） | **CC BY-ND 3.0 TW**（禁止改作） | 標示出處；不可改音量／降噪，只能擷取片段、播放時以 Web Audio 增益 | ✕ 每檔約 9 秒念「字、部首、筆畫、拼讀」，需切段；音量小且不一致。結尾的「ㄅ、ㄚ、ㄅㄚˇ」拼讀可供 2.2 拼拼看參考 |
-| 詞語、句子 | 裝置內建 TTS | — | — | ☑ |
+| 範例詞（154 個，含單字詞） | Gemini TTS（`gemini-3.8-flash-tts`，voice Lora），見 README「錄音」 | Gemini API 使用條款 | 站內自願標示為 AI 語音合成 | ☑ 已上線（2026-10-15） |
+| 句子、貓咪說話 | 裝置內建 TTS | — | — | ☑ |
 
 - 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
-- 單音節錄音：`tools/import_syllables.py` 依 `zhuyin.json` 用到的音節（輕聲除外，共 185 個）從 audio-cmn 下載轉檔，處理同符號錄音。目前用在**單字詞**（貓、馬、筆…）；多字詞仍用 TTS（變調、輕聲較自然）。之後 P2 抓錯遊戲、拼拼看直接用 `sylUrl()`。改了注音後重跑一次即可補新音節。
+- 單音節錄音：`tools/import_syllables.py` 依 `zhuyin.json` 用到的音節（輕聲除外，共 185 個）從 audio-cmn 下載轉檔，處理同符號錄音。原本用在單字詞，2026-10-15 起範例詞全部改用 Gemini TTS（`assets/audio/zh/word/`，`sayWord` → `wordUrl()`），`syl/` 目前沒有程式播放。P2 拼拼看、抓錯遊戲要用的單音節，做到時先用一小批音節試聽 Gemini（每個音節挑代表字＋讀音提示，聲調要逐一確認）再決定用 Gemini 還是 `syl/`；選 Gemini 就不再需要 audio-cmn。
 
 **檔案**
 - `assets/audio/zh/sym/<碼位>.mp3`（37 檔，例 ㄅ = `3105.mp3`；用碼位避免伺服器處理非 ASCII 檔名）

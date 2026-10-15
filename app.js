@@ -139,17 +139,12 @@ async function saySym(s) {
   const r = await playClip(symUrl(s));
   if (r === false) await speak(SYM[s].say);
 }
-// audio-cmn syllable recordings, named by the zhuyin's code points: ㄅㄚˋ -> 3105-311a-2cb.mp3
-const sylUrl = zy => `assets/audio/zh/syl/${[...zy].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
-// one-character words use the syllable recording (TTS often misreads a lone character);
-// longer words stay on TTS so tone sandhi and light tones sound natural
+// Gemini TTS word recordings (tools/gemini_tts.py), named by the characters' code points: 筆 -> 7b46.mp3
+const wordUrl = w => `assets/audio/zh/word/${[...w].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
+// every example word has one voice; device TTS only if the clip fails
 async function sayWord(w) {
-  const zy = Z.words[w]?.zy;
-  if (zy && !zy.includes(' ') && !zy.startsWith('˙')) {
-    if (HAS_TTS) speechSynthesis.cancel();
-    if (await playClip(sylUrl(zy)) !== false) return;
-  }
-  await speak(w);
+  if (HAS_TTS) speechSynthesis.cancel();
+  if (await playClip(wordUrl(w)) === false) await speak(w);
 }
 const narrate = (...steps) => S.settings.narrate ? steps : [];
 // character voices (TTS pitch): 胖胖 is the excitable one, 菲菲 the calm helper
@@ -673,7 +668,7 @@ function settings() {
       <label for="rate">速度：<b id="rateV">${S.settings.rate.toFixed(1)}</b></label>
       <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
       <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
-      <p class="note">這裡的語音用來念詞語和句子。注音符號本身播放真人錄音（見下方「聲音從哪裡來」）；錄音播不出來時，才用這個語音念代表字（例如 ㄅ 念「玻」）。</p>
+      <p class="note">這裡的語音用來念句子和貓咪說話。注音符號和範例詞播放錄音（見下方「聲音從哪裡來」）；錄音播不出來時，才用這個語音代替（例如 ㄅ 念代表字「玻」）。</p>
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
@@ -690,9 +685,8 @@ function settings() {
       <p class="note"><b>注音符號</b>：2017 © 教育部，國語注音符號手冊-開放部件。依
         <a href="https://creativecommons.org/licenses/by/4.0/deed.zh_TW" target="_blank" rel="noopener">創用CC 姓名標示 4.0 國際版</a>授權使用
         （<a href="https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html" target="_blank" rel="noopener">原始出處</a>）；本站僅剪除尾端空白、調整音量。</p>
-      <p class="note"><b>單字的詞（貓、馬、筆…）</b>：錄音者 Chen Wang，取自
-        <a href="https://github.com/hugolpz/audio-cmn" target="_blank" rel="noopener">hugolpz/audio-cmn</a>，依創用CC 姓名標示-相同方式分享授權使用；本站剪除前後空白、調整音量。</p>
-      <p class="note"><b>其他詞語、句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
+      <p class="note"><b>範例詞（貓、冰淇淋…）</b>：以 Google Gemini 語音合成（gemini-3.8-flash-tts）產生，本站剪除前後空白、調整音量。</p>
+      <p class="note"><b>句子、貓咪說話</b>：這台裝置內建的中文語音。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#voice').onchange = e => { S.settings.voice = e.target.value; save(); };
