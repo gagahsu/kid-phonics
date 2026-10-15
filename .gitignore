@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+# API keys (tools/gemini_tts.py)
+.env
 # crop.py output, regenerable from sheets/
 work/
 .DS_Store
