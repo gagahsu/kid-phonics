@@ -346,7 +346,8 @@ function home() {
   const today = S.days[dayKey()];
   const got = STICKERS.filter(x => S.stickers[x.art]).length;
   const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned),
-    bubLeft = Math.max(0, BUB_MIN - learned), catchLeft = Math.max(0, CATCH_MIN - learned);
+    bubLeft = Math.max(0, BUB_MIN - learned), catchLeft = Math.max(0, CATCH_MIN - learned),
+    teachLeft = Math.max(0, TEACH_MIN - spellCount());
   const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
@@ -390,7 +391,9 @@ function home() {
       ${catchLeft
         ? `<a href="#/catch" class="locked" data-act="lockCatch"><span class="ico">🔒</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">再學會 ${catchLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
         : `<a href="#/catch"><span class="ico">🔍</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">胖胖念對了嗎？抓出念錯的地方</span></span>${QUIET}</a>`}
-      <a href="#/teach"><span class="ico">🧑‍🏫</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">當胖胖的老師，念注音給牠聽</span></span>${LOUD}</a>
+      ${teachLeft
+        ? `<a href="#/teach" class="locked" data-act="lockTeach"><span class="ico">🔒</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">拼拼看再拼對 ${teachLeft} 個字，就能玩</span></span>${LOUD}</a>`
+        : `<a href="#/teach"><span class="ico">🧑‍🏫</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">當胖胖的老師，念注音給牠聽</span></span>${LOUD}</a>`}
     </nav>
     ${calendar()}
     <div class="progress">
@@ -418,6 +421,7 @@ function home() {
   ACT.lockSpell = () => seq([{ t: '再多學會幾個符號，就能玩拼拼看喔。', ...FEI }]);
   ACT.lockBub = () => seq([{ t: '再多學會幾個符號，就能玩泡泡喔。', ...FEI }]);
   ACT.lockCatch = () => seq([{ t: '再多學會幾個符號，就能玩抓錯遊戲喔。', ...FEI }]);
+  ACT.lockTeach = () => seq([{ t: '拼拼看再多拼對幾個字，就能教胖胖喔。', ...FEI }]);
 }
 
 // this month's stamps — no streak count on purpose (missing a day shouldn't feel like losing)
@@ -1472,10 +1476,13 @@ function catchRecord(q, firstTry) {
 /* ============ game: 教胖胖 (read a word's zhuyin aloud to 胖胖 — the child is the teacher) ============ */
 // No microphone: a parent listens, or the child judges. Speaking up is what earns the star, so every
 // question gets one; ○ / △ is the child's own call and changes nothing — no record(), no sticker
-// (a sticker would teach "always press ○"). Open from the start for now (the spec's unlock: 拼拼看 ≥ 10).
+// (a sticker would teach "always press ○").
+const TEACH_MIN = 10;         // 拼拼看 first-try spellings (S.spell, one per word per round) before it unlocks
 const TEACH_ONE = 3, TEACH_TWO = 2;
+const spellCount = () => Object.values(S.spell).reduce((n, r) => n + r.ok, 0);
 
 function teachGame() {
+  if (spellCount() < TEACH_MIN) return go('');
   // words the child can read: all their symbols learned first, then seen, then anything
   const syms = w => [...Z.words[w].zy.replace(/[\sˊˇˋ˙]/g, '')];
   const rank = w => syms(w).reduce((n, s) => n + (level(s) === 3 ? 0 : S.seen['zh:' + s] ? 1 : 3), 0) + Math.random() * 2;
