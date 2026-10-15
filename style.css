@@ -521,3 +521,19 @@ img { display: block; max-width: 100%; }
   position: fixed; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; z-index: 50; pointer-events: none;
   background: repeating-linear-gradient(35deg, #E0566B 0 4px, #FF9FAE 4px 8px); box-shadow: 0 2px 4px rgba(0,0,0,.25);
 }
+
+/* 教胖胖: a word's zhuyin alone, big; the picture comes after the child has read it */
+.tag.loud { background: #FFEBD6; color: #B35A00; }
+.teach-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 210px; margin: 6px auto 16px; padding: 18px 26px; width: fit-content; min-width: 200px;
+  background: var(--paper); border-radius: var(--r); box-shadow: var(--shadow);
+}
+.teach-zy { display: flex; gap: 22px; font-family: var(--kai); }
+.teach-zy .zy { font-size: 56px; padding-right: 30px; min-width: 56px; }
+.teach-zy .zy .tn { font-size: 40px; right: -4px; }
+.teach-zy .zy:not(.one) .tn { transform: translateY(-30%); }
+.teach-zy .zy .lt { font-size: 40px; }
+.teach-card.shown img { width: 140px; height: 140px; object-fit: contain; }
+.teach-card.shown .zw { font-size: 44px; }
+.teach-card.shown .zy { font-size: 20px; }

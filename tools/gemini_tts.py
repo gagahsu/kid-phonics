@@ -34,6 +34,12 @@ STYLES = {
     'pang': (f'{TW}. You are 胖胖, a chubby, curious, excitable young cat in a game for 5-year-olds: '
              'bright, a little high-pitched, bouncy and eager, slightly clumsy and cute. Speak clearly and not too fast, '
              'each line in the same voice and loudness.'),
+    # 胖胖 reading example words (assets/audio/zh/pang-word/): same voice, but the excitable 'pang' style
+    # pulled fourth tones up (爸爸 came out bá bá), so words are read as plain statements
+    'pang-word': (f'{TW}. You are 胖胖, a young cat, reading single words to a 5-year-old: friendly and a little bright, '
+                  'but calm. Read each word as a plain statement with falling, finished intonation, never like a question '
+                  'or an excited exclamation. Keep every syllable on its own dictionary tone; fourth tones fall sharply '
+                  'from high to low, neutral tones are short and light. Same voice and loudness for every word.'),
     'fei': (f'{TW}. You are 菲菲, a calm, gentle, kind cat who helps young children learn: '
             'soft, warm and patient like a kindergarten teacher, unhurried and clear. '
             'Each line in the same voice and loudness.'),

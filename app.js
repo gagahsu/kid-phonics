@@ -75,7 +75,7 @@ function voiceFor() {
 const player = (() => { try { const a = new Audio(); a.preload = 'auto'; return a; } catch { return null; } })();
 let clipFin = null;
 function stopClip() { if (clipFin) { try { player.pause(); } catch { /* ignore */ } clipFin('stop'); } }
-function playClip(url) {
+function playClip(url, volume = 1) {
   return new Promise(resolve => {
     if (!player) return resolve(false);
     stopClip();
@@ -90,6 +90,7 @@ function playClip(url) {
     player.onended = () => fin(true); player.onerror = () => fin(false); player.onplaying = () => { started = true; };
     clipFin = fin;
     player.muted = false;
+    player.volume = volume;
     player.src = url;
     try { player.play()?.catch?.(() => fin(false)); } catch { fin(false); }
   });
@@ -115,6 +116,7 @@ function speak(text, o = {}) {
     if (v) u.voice = v;
     u.rate = o.rate ?? S.settings.rate;
     u.pitch = o.pitch ?? 1;
+    u.volume = o.volume ?? 1;
     let done = false;
     const end = () => { if (!done) { done = true; resolve(); } };
     u.onend = end; u.onerror = end;
@@ -146,9 +148,9 @@ async function saySym(s) {
 // Gemini TTS word recordings (tools/gemini_tts.py), named by the characters' code points: 筆 -> 7b46.mp3
 const wordUrl = w => `assets/audio/zh/word/${[...w].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
 // every example word has one voice; device TTS only if the clip fails
-async function sayWord(w) {
+async function sayWord(w, volume = 1) {
   if (HAS_TTS) speechSynthesis.cancel();
-  if (await playClip(wordUrl(w)) === false) await speak(w);
+  if (await playClip(wordUrl(w), volume) === false) await speak(w, { volume });
 }
 // 抓錯遊戲: the words 胖胖 reads, in his own voice (Gemini Puck); the example-word clip if one is missing
 async function sayPangWord(w) {
@@ -228,14 +230,18 @@ const PP_EYES = {
     <circle cx="112" cy="128" r="8" fill="#1f1d1c"/><circle cx="168" cy="128" r="8" fill="#1f1d1c"/>
     <circle cx="109" cy="124" r="3" fill="#fff"/><circle cx="165" cy="124" r="3" fill="#fff"/>`,
   happy: `<path d="M97 132 Q112 114 127 132 M153 132 Q168 114 183 132" class="ln" style="stroke-width:4.5"/>`,
+  think: `<circle cx="112" cy="128" r="17" fill="#C2C86C" class="ol"/><circle cx="168" cy="128" r="17" fill="#C2C86C" class="ol"/>
+    <circle cx="117" cy="121" r="10" fill="#1f1d1c"/><circle cx="173" cy="121" r="10" fill="#1f1d1c"/>
+    <circle cx="114" cy="117" r="3.5" fill="#fff"/><circle cx="170" cy="117" r="3.5" fill="#fff"/>`,
 };
 const PP_MOUTH = {
   talk: `<path d="M140 157 Q140 164 132 165 M140 157 Q140 164 148 165" class="ln"/>`,
   oh: `<ellipse cx="140" cy="167" rx="5" ry="6.5" fill="#B8324F" class="ol" style="stroke-width:2"/>`,
   happy: `<path d="M131 160 Q140 175 149 160Z" fill="#B8324F" class="ol" style="stroke-width:2"/>`,
+  think: `<path d="M131 163 q4.5 -4 9 0 q4.5 4 9 0" class="ln"/>`,
 };
 function pangSVG(mood) {
-  const eyes = mood === 'happy' ? PP_EYES.happy : mood === 'oh' ? PP_EYES.oh : PP_EYES.open;
+  const eyes = PP_EYES[mood] || PP_EYES.open;
   const mouth = PP_MOUTH[mood] || PP_MOUTH.talk;
   return `<svg viewBox="52 26 214 270" aria-hidden="true">
     <path d="M210 258 Q226 260 230 250 Q233 244 229 240" fill="none" stroke="#3d3330" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
@@ -314,7 +320,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, teach: teachGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -334,6 +340,7 @@ app.addEventListener('click', e => {
 /* ============ home ============ */
 const QUIET = '<span class="tag">🤫 不用開口</span>';
 const SOFT = '<span class="tag">🙂 小聲就好</span>';
+const LOUD = '<span class="tag loud">📣 要開口</span>';
 function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const today = S.days[dayKey()];
@@ -383,6 +390,7 @@ function home() {
       ${catchLeft
         ? `<a href="#/catch" class="locked" data-act="lockCatch"><span class="ico">🔒</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">再學會 ${catchLeft} 個符號（★），就能玩</span></span>${QUIET}</a>`
         : `<a href="#/catch"><span class="ico">🔍</span><span class="mt"><span class="t">抓錯遊戲</span><br><span class="s">胖胖念對了嗎？抓出念錯的地方</span></span>${QUIET}</a>`}
+      <a href="#/teach"><span class="ico">🧑‍🏫</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">當胖胖的老師，念注音給牠聽</span></span>${LOUD}</a>
     </nav>
     ${calendar()}
     <div class="progress">
@@ -1461,6 +1469,83 @@ function catchRecord(q, firstTry) {
   G.newStickers.push(...unlockStickers());
 }
 
+/* ============ game: 教胖胖 (read a word's zhuyin aloud to 胖胖 — the child is the teacher) ============ */
+// No microphone: a parent listens, or the child judges. Speaking up is what earns the star, so every
+// question gets one; ○ / △ is the child's own call and changes nothing — no record(), no sticker
+// (a sticker would teach "always press ○"). Open from the start for now (the spec's unlock: 拼拼看 ≥ 10).
+const TEACH_ONE = 3, TEACH_TWO = 2;
+
+function teachGame() {
+  // words the child can read: all their symbols learned first, then seen, then anything
+  const syms = w => [...Z.words[w].zy.replace(/[\sˊˇˋ˙]/g, '')];
+  const rank = w => syms(w).reduce((n, s) => n + (level(s) === 3 ? 0 : S.seen['zh:' + s] ? 1 : 3), 0) + Math.random() * 2;
+  const take = (list, n) => list.map(w => [rank(w), w]).sort((a, b) => a[0] - b[0]).slice(0, n).map(x => x[1]);
+  const words = Object.keys(Z.words);
+  const qs = [...take(words.filter(w => [...w].length === 1), TEACH_ONE), ...take(words.filter(w => [...w].length === 2), TEACH_TWO)]
+    .map(w => ({ w }));
+  G = { cfg: { game: 'teach' }, qs, k: 0, results: [], over: false, newStickers: [] };
+  renderTeach();
+}
+
+function renderTeach() {
+  if (G.k >= G.qs.length) return renderDone();
+  const q = G.qs[G.k];
+  const ask = G.k === 0 ? '老師好！這個要怎麼念？請大聲念給我聽～' : '這個呢？請大聲念給我聽～';
+  app.innerHTML = `
+    ${roundBar()}
+    <div class="q">
+      <div class="ask">${catEl('pang', 'think')}<div class="bubble" id="bubble">${ask}</div></div>
+      <div class="teach-card" id="tcard"><span class="teach-zy">${Z.words[q.w].zy.split(' ').map(y => zyCol(y)).join('')}</span></div>
+      <div class="btn-row" id="tbtns">
+        <button class="btn" data-act="hint">🤫 偷偷提示</button>
+        <button class="btn primary big" data-act="said">我念好了！</button>
+      </div>
+      <div id="next"></div>
+      ${G.k === 0 ? '<p class="note">這裡不會錄音。請家長在旁邊聽孩子念，或讓孩子自己判斷念得一不一樣。</p>' : ''}
+    </div>`;
+  ACT.quit = () => { G = null; go(''); };
+  // quiet, so it feels like a secret — and the child still has to say it themselves
+  ACT.hint = () => seq([() => sayWord(q.w, 0.4)]);
+  ACT.said = () => teachSaid(q);
+  ACT.same = () => teachJudge(q, true);
+  ACT.diff = () => teachJudge(q, false);
+  ACT.next = () => { hush(); G.k++; renderTeach(); };
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || q.said || location.hash !== '#/teach') return;
+    seq(narrate({ t: ask, ...PANG }));
+  }, 300);
+}
+
+// the star is for speaking up; then the picture and 胖胖's own try
+function teachSaid(q) {
+  if (q.said) return;
+  q.said = true;
+  G.results[G.k] = true;
+  ding();
+  $('#tcard').innerHTML = `${img(q.w)}${ruby(q.w)}`;
+  $('#tcard').classList.add('shown');
+  $('#tbtns').innerHTML = `<button class="btn big" data-act="same">○ 一樣！</button><button class="btn big" data-act="diff">△ 不太一樣</button>`;
+  bubble(`${q.w}！我學會了！我念的跟你一樣嗎？`); setCat('pang', 'happy', 'hop');
+  const g = G;
+  seq([300, () => sayPangWord(q.w), 200, ...narrate({ t: '我學會了！我念的跟你一樣嗎？', ...PANG }),
+    () => { if (G === g && G.qs[G.k] === q && !q.judged) setCat('pang', 'talk'); }]);
+}
+
+function teachJudge(q, same) {
+  if (q.judged) return;
+  q.judged = true;
+  $('#tbtns').innerHTML = '';
+  const last = G.k + 1 >= G.qs.length;
+  $('#next').innerHTML = `<button class="btn primary big" data-act="next">${last ? '看看拿了幾顆星 ⭐' : '下一題 →'}</button>`;
+  if (same) {
+    bubble('謝謝老師！'); setCat('pang', 'happy', 'dance');
+    seq(narrate({ t: '謝謝老師！', ...PANG }));
+  } else {
+    bubble('沒關係，我們一起慢慢念'); setCat('pang', 'talk', 'wobble');
+    seq([...narrate({ t: '沒關係，我們一起慢慢念', ...PANG }, 300), () => sayWord(q.w), 600, () => sayWord(q.w)]);
+  }
+}
+
 const REST_AT = 3;   // rounds per day before 菲菲 suggests a break (never blocks)
 function renderDone() {
   if (G.over) return;           // re-rendered by navigation: don't count the round twice
@@ -1469,6 +1554,7 @@ function renderDone() {
   const marks = G.cfg.game === 'memory' ? [1, 2, 3].map(n => n <= memStars(G.tries)) : G.results;
   const stars = marks.filter(Boolean).length;
   const msg = G.cfg.game === 'memory' ? (stars === 3 ? '記得好清楚！' : '全部找到了！')
+    : G.cfg.game === 'teach' ? '謝謝你陪胖胖練習！'
     : stars === G.qs.length ? '全部答對！' : stars >= 3 ? '很棒喔！' : '多聽幾次就會了！';
   const day = (S.days[dayKey()] ??= { rounds: 0, stamp: '' });
   day.rounds++;

@@ -120,8 +120,10 @@ py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei
 - 一個字的台詞（胖！、菲。）Gemini 容易念兩次，句中的逗號也可能被切成兩段，段數剛好對上時 `split_tts.py` 不會發現。
   每句的秒數要對照字數看，對不上就要手動切。
 
-`assets/audio/zh/pang-word/`：抓錯遊戲裡胖胖念的 33 個一字詞（Gemini TTS，2026-10-15，voice `Puck`、style `pang`，
-每個詞附拼音聲調提示）。檔名規則同 `word/`；缺檔時改播 `word/` 的錄音。
+`assets/audio/zh/pang-word/`：胖胖念的範例詞，全部 154 個（Gemini TTS，2026-10-15，voice `Puck`、style `pang`）。
+抓錯遊戲用的 33 個一字詞先錄、每個附拼音聲調提示；其餘 121 個給教胖胖用，一字詞附提示、多字詞只帶 `tts_hints.tsv`
+（`work/tts/teach_word_1|2/`）。檔名規則同 `word/`；缺檔時改播 `word/` 的錄音。**新增範例詞時這裡也要補錄。**
+補錄、重念用 `--style pang-word --voice Puck`：`pang` style 太興奮，會把四聲念上去（爸爸 → ㄅㄚˊㄅㄚˊ，2026-10-15 用 `pang-word` 重念 爸爸、皮球）。
 
 `assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（ㄇㄠ = `3107-3120.mp3`）：範例詞用到的單音節（輕聲除外），
 來源 [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（錄音者 Chen Wang，README 標示 CC BY-SA，版本未載明）。
