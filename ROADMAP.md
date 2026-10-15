@@ -48,7 +48,7 @@
 | 用途 | 來源 | 授權（已查證 2026-10-14） | 義務 | 狀態 |
 |---|---|---|---|---|
 | 37 個符號 | 教育部《國語注音符號手冊》數位版開放部件（[首頁](https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html) `bopomofo_materials_20170213.zip`） | **CC BY 4.0**（壓縮檔 `license.txt`；另載明視為符合政府資料開放授權條款） | 標示「2017 © 教育部，國語注音符號手冊-開放部件」＋授權連結 | ☑ 已上線 |
-| 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ☑ 已上線（家長試聽後選用，2026-10-14）；授權版本仍待確認 |
+| 單音節（四聲真人念） | [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（1,707 音節，錄音者 Chen Wang） | README 寫 CC BY-SA，**版本未載明、repo 無 LICENSE 檔** | 標示出處＋改作須相同方式分享 | ✕ 2026-10-14 曾選用；2026-10-15 移除（範例詞、拼拼看、抓錯遊戲都改用 Gemini 錄音，沒有程式播放） |
 | 單音節（未採用） | [davinfifield/mp3-chinese-pinyin-sound](https://github.com/davinfifield/mp3-chinese-pinyin-sound) | **Unlicense**（GitHub API 確認） | 無 | ✕ 全程低頻嗡嗡聲＋人聲很小 |
 | 單音節（未採用，可再評估） | 教育部《國語辭典簡編本》單字屬性聲音檔 `dict_concised_music_word_2014_20260929.zip`（1.5 GB，可用 HTTP Range 只抓需要的檔） | **CC BY-ND 3.0 TW**（禁止改作） | 標示出處；不可改音量／降噪，只能擷取片段、播放時以 Web Audio 增益 | ✕ 每檔約 9 秒念「字、部首、筆畫、拼讀」，需切段；音量小且不一致。結尾的「ㄅ、ㄚ、ㄅㄚˇ」拼讀可供 2.2 拼拼看參考 |
 | 範例詞（154 個，含單字詞） | Gemini TTS（`gemini-3.8-flash-tts`，voice Lora），見 README「錄音」 | Gemini API 使用條款 | 站內自願標示為 AI 語音合成 | ☑ 已上線（2026-10-15） |
@@ -57,11 +57,10 @@
 
 - 符號維持教育部錄音（2026-10-15 試過 Gemini TTS 念 8 個難的符號 ㄅㄈㄓㄖㄜㄝㄥㄦ：16 項只念出 8 段、念法不對，不採用）。與詞卡（Gemini）音色不同，先接受；音量已對齊（+4.3 dB）。
 - 符號錄音：`tools/import_moe_audio.py` 從官方壓縮檔轉檔（剪尾端空白、loudnorm、mono 64k mp3）；F1–F37 與符號的對應取自手冊 HTML（注意 ㄧㄨㄩ 排在 F35–37）。家長設定頁已有「聲音從哪裡來」。
-- 單音節錄音：`tools/import_syllables.py` 依 `zhuyin.json` 用到的音節（輕聲除外，共 185 個）從 audio-cmn 下載轉檔，處理同符號錄音。原本用在單字詞，2026-10-15 起範例詞全部改用 Gemini TTS（`assets/audio/zh/word/`，`sayWord` → `wordUrl()`），`syl/` 目前沒有程式播放。P2 拼拼看、抓錯遊戲要用的單音節，做到時先用一小批音節試聽 Gemini（每個音節挑代表字＋讀音提示，聲調要逐一確認）再決定用 Gemini 還是 `syl/`；選 Gemini 就不再需要 audio-cmn。
+- 單音節錄音（audio-cmn）：2026-10-15 移除 `assets/audio/zh/syl/`（185 檔）、`tools/import_syllables.py` 和挑錄音用的暫時頁 `review/audio/`。範例詞全部改用 Gemini TTS（`word/`），拼拼看用一字詞的錄音當音節的聲音，抓錯遊戲用胖胖念的詞（`pang-word/`），都不需要單音節錄音。要找回：`git checkout 915fa02 -- assets/audio/zh/syl tools/import_syllables.py review`。
 
 **檔案**
 - `assets/audio/zh/sym/<碼位>.mp3`（37 檔，例 ㄅ = `3105.mp3`；用碼位避免伺服器處理非 ASCII 檔名）
-- `assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（例 ㄇㄠ = `3107-3120.mp3`、ㄇㄚˇ = `3107-311a-2c7.mp3`；一聲不加符號）
 - 不內嵌 base64（參考站整站 700KB 都是音檔），改成按需載入＋快取。
 
 **播放規格**
@@ -427,4 +426,4 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
 
 ## 待決事項
 
-- audio-cmn 的 CC BY-SA 版本（可在該 repo 開 issue 詢問）。**等 Gemini TTS 做完再決定**（2026-10-15）：若單字詞改用 `word/`，且 2.2、2.5 也找到別的單音節來源，就不用 audio-cmn，此題作廢。
+- ~~audio-cmn 的 CC BY-SA 版本~~：作廢（2026-10-15），已不使用 audio-cmn。

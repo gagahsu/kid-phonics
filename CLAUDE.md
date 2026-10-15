@@ -9,7 +9,6 @@
 - 注音符號：教育部錄音 `assets/audio/zh/sym/`。Gemini 試過念不好，不要換（見 ROADMAP 0.1）。
 - 範例詞：Gemini TTS 錄音 `assets/audio/zh/word/`（`sayWord` → `wordUrl()`），播不出來才用裝置 TTS。
   產生、重念的方法見 README「錄音」。
-- `assets/audio/zh/syl/`（audio-cmn 單音節）目前沒有程式使用，保留給 P2 評估。
 
 ## 改範例詞或重念時
 

@@ -128,14 +128,6 @@ py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei
 （`work/tts/teach_word_1|2/`）。檔名規則同 `word/`；缺檔時改播 `word/` 的錄音。**新增範例詞時這裡也要補錄。**
 補錄、重念用 `--style pang-word --voice Puck`：`pang` style 太興奮，會把四聲念上去（爸爸 → ㄅㄚˊㄅㄚˊ，2026-10-15 用 `pang-word` 重念 爸爸、皮球）。
 
-`assets/audio/zh/syl/<各字碼位以 - 連接>.mp3`（ㄇㄠ = `3107-3120.mp3`）：範例詞用到的單音節（輕聲除外），
-來源 [hugolpz/audio-cmn](https://github.com/hugolpz/audio-cmn)（錄音者 Chen Wang，README 標示 CC BY-SA，版本未載明）。
-**目前沒有程式播放**（範例詞改用 `word/`），保留給 P2 拼拼看、抓錯遊戲評估（見 ROADMAP 0.1）。重新下載：
-
-```
-py tools/import_syllables.py
-```
-
 ## 注音校對
 
 範例詞注音由 AI 初擬，2026-10-14 已逐詞比對教育部《國語辭典簡編本》（中小學用；資料 `dict_concised_2014_20260929`，

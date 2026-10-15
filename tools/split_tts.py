@@ -21,7 +21,9 @@ import subprocess
 import sys
 import wave
 
-from import_syllables import FILTER
+# same processing as the other clips: rumble cut, loudness, trim silence at both ends
+TRIM = 'silenceremove=start_periods=1:start_threshold=-40dB'
+FILTER = f'highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=7,{TRIM},areverse,{TRIM},areverse,adelay=30,apad=pad_dur=0.05'
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'audio', 'zh', 'word')

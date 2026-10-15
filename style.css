@@ -654,3 +654,9 @@ img { display: block; max-width: 100%; }
 }
 .stk img { max-width: min(110px, 100%); }
 @media (min-width: 700px) { .stk img { max-width: 150px; } }
+
+/* 家長設定: the backup device voice, folded away */
+.backup { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.backup summary { cursor: pointer; color: var(--ink-soft); font-size: 15px; padding: 4px 0; }
+.backup[open] summary { margin-bottom: 4px; }
+.backup .warn { margin: 8px 0; }

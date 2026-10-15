@@ -1752,17 +1752,22 @@ function settings() {
       </ul>
     </div>
     ${report()}
-    ${!HAS_TTS ? '<div class="warn">這個瀏覽器不支援語音朗讀，請改用 Chrome、Safari 或 Edge。</div>'
-      : !zh.length ? '<div class="warn">找不到中文語音。Android 請到「設定 → 文字轉語音」安裝 Google 中文（台灣）語音；Windows 請在「語言」加入中文（台灣）。</div>' : ''}
     <div class="panel">
-      <h3>朗讀聲音</h3>
-      <label for="voice">語音</label>
-      <select id="voice">${zh.length ? zh.map(v => `<option value="${esc(v.voiceURI)}" ${cur && v.voiceURI === cur.voiceURI ? 'selected' : ''}>${esc(v.name)}（${esc(v.lang)}）</option>`).join('') : '<option>（無中文語音）</option>'}</select>
-      <label for="rate">速度：<b id="rateV">${S.settings.rate.toFixed(1)}</b></label>
-      <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
-      <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
-      <p class="note">注音符號、範例詞和貓咪說話都播放錄音（見下方「聲音從哪裡來」）；這裡的語音只在錄音播不出來時代替（例如 ㄅ 念代表字「玻」）。</p>
+      <h3>聲音</h3>
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
+      <p class="note">注音符號、範例詞和貓咪說話都是預先錄好的（見下方「聲音從哪裡來」）。</p>
+      <!-- the device voice only stands in when a recording won't play, so its settings stay folded away -->
+      <details class="backup">
+        <summary>錄音播不出來時的備用語音</summary>
+        <p class="note">只有錄音播不出來時（例如網路斷了）才會改用這台裝置內建的語音，平常用不到。例如 ㄅ 會念代表字「玻」。</p>
+        ${!HAS_TTS ? '<div class="warn">這個瀏覽器不支援語音朗讀，請改用 Chrome、Safari 或 Edge。</div>'
+          : !zh.length ? '<div class="warn">找不到中文語音。Android 請到「設定 → 文字轉語音」安裝 Google 中文（台灣）語音；Windows 請在「語言」加入中文（台灣）。</div>' : ''}
+        <label for="voice">語音</label>
+        <select id="voice">${zh.length ? zh.map(v => `<option value="${esc(v.voiceURI)}" ${cur && v.voiceURI === cur.voiceURI ? 'selected' : ''}>${esc(v.name)}（${esc(v.lang)}）</option>`).join('') : '<option>（無中文語音）</option>'}</select>
+        <label for="rate">速度：<b id="rateV">${S.settings.rate.toFixed(1)}</b></label>
+        <input id="rate" type="range" min="0.5" max="1.2" step="0.1" value="${S.settings.rate}">
+        <div class="btn-row"><button class="btn" data-act="test">🔊 試聽</button></div>
+      </details>
     </div>
     <div class="panel">
       <h3>泡泡、大對決的速度</h3>
