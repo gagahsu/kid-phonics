@@ -32,6 +32,8 @@ S.seen ??= {};                         // 'zh:ㄅ' -> first time its page was op
 S.stickers ??= {};                     // picture slug -> unlocked at (ms); never taken back
 S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp}
 S.spell ??= {};                        // 'zh:貓' -> {ok, round}: 拼拼看 first-try spellings, one per round
+S.map ??= {};                          // 'zh:ㄅㄆ' -> 闖關地圖: that pair first beaten in a 大對決 at (ms)
+S.settings.learnView ??= 'map';        // 認識符號: 'map' (闖關地圖) | 'grid'
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
 const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
 function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
@@ -312,7 +314,7 @@ function setCat(who, mood, anim = '', scope = app) {
 }
 
 /* ============ routing ============ */
-const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, stickers, settings };
+const routes = { '': home, learn, sym: symPage, practice, sort: sortGame, memory: memoryGame, spell: spellGame, bubbles: bubbleGame, catch: catchGame, boss: bossGame, stickers, settings };
 function go(path) { location.hash = '#/' + path; }
 function route() {
   hush();
@@ -446,8 +448,9 @@ function stickers() {
   ACT.stkLock = el => seq([{ t: '學會', ...FEI }, () => saySym(el.dataset.s), { t: '，就能拿到這張貼紙喔。', ...FEI }]);
 }
 
-/* ============ learn: all symbols ============ */
+/* ============ learn: all symbols (闖關地圖 or the plain grid) ============ */
 function learn() {
+  const map = S.settings.learnView === 'map';
   const groups = ['i', 'm', 'f'].map(g => {
     const list = Z.symbols.filter(x => x.g === g);
     return `<h3 class="group-h">${GROUP_NAME[g]}<small>${list.length} 個</small></h3>
@@ -455,8 +458,54 @@ function learn() {
   }).join('');
   const legend = `<p class="legend">
     <span class="dots"><i class="on"></i><i></i><i></i></span>聽音練習連續答對的次數
-    <span class="sep"></span><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span>學會了 <b>★</b></p>`;
-  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>認識符號</h2></div>${legend}${groups}`;
+    <span class="sep"></span><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span>學會了 <b>${map ? '🚩' : '★'}</b></p>`;
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>認識符號</h2></div>
+    <div class="chips" role="group" aria-label="怎麼排">
+      <button class="chip" data-act="view" data-k="map" aria-pressed="${map}">🗺️ 地圖</button>
+      <button class="chip" data-act="view" data-k="grid" aria-pressed="${!map}">🔲 方格</button>
+    </div>${legend}${map ? mapLegs() : groups}`;
+  ACT.view = el => { S.settings.learnView = el.dataset.k; save(); learn(); };
+  // route() scrolls to the top afterwards: bring 胖胖 (where the child is up to) into view
+  if (map) setTimeout(() => $('.isle .here')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+}
+
+// 闖關地圖: the 37 symbols in standard order as islands along a path, 5 legs. Each leg ends with a
+// 大對決 (#/boss/<leg>) over that leg's easily-confused pairs (a pair spanning two legs, like ㄈㄏ, goes to the later one).
+// A leg is won once every one of its pairs has been beaten; that only reveals the next leg's look —
+// every island (and every 大對決) can be tapped from the start.
+const LEGS = ['ㄅㄆㄇㄈㄉㄊㄋ', 'ㄌㄍㄎㄏㄐㄑㄒ', 'ㄓㄔㄕㄖㄗㄘㄙ', 'ㄧㄨㄩㄚㄛㄜㄝ', 'ㄞㄟㄠㄡㄢㄣㄤㄥㄦ'].map(l => [...l]);
+const legOf = s => LEGS.findIndex(l => l.includes(s));
+const legPairs = i => PAIRS.filter(p => Math.max(...p.map(legOf)) === i);
+const pairWon = p => !!S.map['zh:' + p.join('')];
+const bossWon = i => legPairs(i).every(pairWon);
+const MAP_X = [50, 78, 50, 22], MAP_ROW = 86, MAP_TOP = 50;
+
+function mapLegs() {
+  const here = Z.symbols.find(x => level(x.s) < 3)?.s;   // 胖胖 waits at the first island not yet learned
+  return LEGS.map((syms, i) => {
+    const pts = [...syms.map((_, k) => MAP_X[k % 4]), 50].map((x, k) => [x, MAP_TOP + k * MAP_ROW]);
+    const h = pts.at(-1)[1] + MAP_TOP + 10;
+    const road = pts.map(([x, y], k) => `${k ? 'L' : 'M'}${x} ${y}`).join(' ');
+    const isles = syms.map((s, k) => {
+      const [x, y] = pts[k];
+      return `<a class="isle g-${SYM[s].g}${level(s) === 3 ? ' learned' : ''}" style="left:${x}%;top:${y}px" href="#/sym/${s}" aria-label="${s}">${s}${dots(s)}${
+        s === here ? `<span class="here ${x > 50 ? 'l' : 'r'}">${catEl('pang')}</span>` : ''}</a>`;
+    }).join('');
+    const won = bossWon(i), [bx, by] = pts.at(-1);
+    const boss = `<a class="isle boss${won ? ' won' : ''}" style="left:${bx}%;top:${by}px" href="#/boss/${i + 1}"
+      aria-label="第 ${i + 1} 關大對決${won ? '，過關了' : ''}">
+      <span class="b-ico">${won ? '🏆' : '⚔️'}</span><span class="b-t">大對決</span>
+      <span class="b-p">${legPairs(i).map(p => `<i class="${pairWon(p) ? 'ok' : ''}">${p.join('')}</i>`).join(' ')}</span></a>`;
+    const fog = i > 0 && !bossWon(i - 1);
+    const got = syms.filter(s => level(s) === 3).length;
+    return `<section class="leg${fog ? ' fog' : ''}">
+      <h3 class="group-h">第 ${i + 1} 關<small>學會 ${got} / ${syms.length}${won ? '・🏆 過關' : ''}</small></h3>
+      ${fog ? '<p class="fog-note">☁️ 打贏上一關的大對決，這裡就會亮起來（還是可以先點進去學喔）</p>' : ''}
+      <div class="path" style="height:${h}px">
+        <svg class="road" viewBox="0 0 100 ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${road}"/></svg>
+        ${isles}${boss}
+      </div></section>`;
+  }).join('');
 }
 
 /* ============ one symbol ============ */
@@ -1162,6 +1211,153 @@ async function bubPop(q, b) {
   if (G === g && G.qs[G.k] === q && location.hash === '#/bubbles') { G.k++; renderBubbles(); }
 }
 
+/* ============ game: 大對決 (闖關地圖: 胖胖 throws yarn at the pictures with the sound you hear) ============ */
+// Picture cards of one easily-confused pair (ㄓ / ㄗ) ride a conveyor belt; 菲菲 says one of the two
+// symbols and the child taps every picture that has it. Each pair is played twice (once per symbol).
+// No text under the pictures — hearing the word is the point. A card that rides off comes back; a wrong
+// hit costs nothing but counts as a slip. A pair is beaten with at most BOSS_SLIP slips over its two waves.
+const BOSS_PAIRS = 2;         // pairs per round -> 4 waves
+const BOSS_HIT = 3;           // target pictures per wave (fewer if the symbol has fewer words: ㄦ)
+const BOSS_FOIL = 3;          // pictures of the other symbol riding along
+const BOSS_SLIP = 1;
+const BELT_SPEED = { slow: 42, mid: 62, fast: 88 };   // px/s, follows the 泡泡 speed setting
+
+function bossGame(arg) {
+  const leg = LEGS[arg - 1] ? +arg : 0;
+  if (!leg) return go('learn');
+  // pairs not beaten yet first, then the ones the child misses most
+  const pairs = legPairs(leg - 1).map(p => [(pairWon(p) ? 0 : 100) + stat(p[0]).bad + stat(p[1]).bad + Math.random() * 2, p])
+    .sort((x, y) => y[0] - x[0]).slice(0, BOSS_PAIRS).map(x => x[1]);
+  const has = (w, s) => firstSyl(w).includes(s);
+  const qs = pairs.flatMap(pair => {
+    const [a, b] = pair;
+    const only = (s, o) => shuffle(Object.keys(Z.words).filter(w => has(w, s) && !has(w, o)));
+    return shuffle([[a, b], [b, a]]).map(([t, o]) => {
+      const hits = only(t, o).slice(0, BOSS_HIT);
+      return { t, pair, hits, cards: shuffle([...hits, ...only(o, t).slice(0, BOSS_FOIL)]) };
+    });
+  });
+  G = { cfg: { game: 'boss', arg: leg }, leg, qs, k: 0, results: [], over: false, told: {}, newStickers: [] };
+  renderBoss();
+}
+
+function renderBoss() {
+  if (G.k >= G.qs.length) return bossEnd();
+  const q = G.qs[G.k];
+  q.slips = 0; q.got = []; q.locked = false;
+  app.innerHTML = `
+    ${roundBar('回')}
+    <div class="q">
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">⚔️ 第 ${G.leg} 關大對決！</div></div>
+      <div class="boss-target">
+        <button class="big-sym boss-sym g-${SYM[q.t].g}" data-act="replay" aria-label="再聽一次">${q.t}<span class="spk">🔊</span></button>
+        <span class="yarns" aria-label="還要打 ${q.hits.length} 張">${q.hits.map(() => '<i></i>').join('')}</span>
+      </div>
+      <div class="belt" style="--belt:${BELT_SPEED[S.settings.bubbles] || BELT_SPEED.slow}px">
+        ${q.cards.map(w => `<button class="bcard" data-w="${esc(w)}" aria-label="${esc(w)}">${img(w)}</button>`).join('')}
+      </div>
+      <div class="thrower">${catEl('pang')}</div>
+    </div>`;
+  ACT.quit = () => { G = null; go(''); };
+  ACT.replay = el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); seq([() => saySym(q.t)]); };
+  for (const c of app.querySelectorAll('.bcard')) {
+    // pointerdown, not click: a moving target can slide out from under a slow tap
+    c.addEventListener('pointerdown', e => { e.preventDefault(); bossThrow(q, c); });
+    c.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bossThrow(q, c); } });
+  }
+  beltRun(q);
+  const intro = !G.told.b;
+  G.told.b = true;
+  setTimeout(() => {
+    if (G?.qs[G.k] !== q || q.got.length || q.slips || !location.hash.startsWith('#/boss')) return;
+    seq([...(intro ? narrate({ t: '大對決！', ...PANG }, 150, { t: '聽到這個音的圖片，就丟毛線球打它！', ...FEI }, 200)
+      : narrate({ t: '換這個音', ...FEI }, 150)), () => saySym(q.t)]);
+  }, 300);
+}
+
+// the belt: cards evenly spaced on a loop longer than the screen, moving right to left; a hit card
+// is taken off and leaves a gap
+function beltRun(q) {
+  const belt = $('.belt'), cards = [...belt.querySelectorAll('.bcard')];
+  const speed = parseFloat(getComputedStyle(belt).getPropertyValue('--belt'));
+  const g = G;
+  let off = 0, last = performance.now();
+  const step = now => {
+    if (G !== g || G.qs[G.k] !== q || !belt.isConnected) return;
+    const W = belt.clientWidth, cw = cards[0].offsetWidth, gap = Math.max(cw + 24, (W + cw + 24) / cards.length), L = gap * cards.length;
+    if (!q.locked) off += speed * Math.min(0.05, (now - last) / 1000);
+    last = now;
+    cards.forEach((c, i) => { c.style.transform = `translateX(${((i * gap - off) % L + L) % L - cw}px)`; });
+    belt.style.backgroundPositionX = `${-off}px`;
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function bossThrow(q, c) {
+  if (q.locked || c._busy) return;
+  c._busy = true;
+  const right = q.hits.includes(c.dataset.w);
+  // 胖胖 throws: a yarn ball flies from him to the card
+  setCat('pang', 'oh', 'hop', $('.thrower'));
+  const from = $('.thrower').getBoundingClientRect(), to = c.getBoundingClientRect();
+  const ball = document.createElement('i');
+  ball.className = 'yarn';
+  app.append(ball);
+  // aim where the card will be when the ball lands: the belt keeps moving
+  const fly = 380, speed = parseFloat(getComputedStyle($('.belt')).getPropertyValue('--belt'));
+  const x0 = from.left + from.width / 2, y0 = from.top + 10, x1 = to.left + to.width / 2 - speed * fly / 1000, y1 = to.top + to.height / 2;
+  await ball.animate([
+    { transform: `translate(${x0}px, ${y0}px) rotate(0)` },
+    { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 60}px) rotate(270deg)`, offset: 0.5 },
+    { transform: `translate(${x1}px, ${y1}px) rotate(540deg)` },
+  ], { duration: fly, easing: 'ease-in' }).finished.catch(() => {});
+  ball.remove();
+  if (G?.qs[G.k] !== q) return;
+  if (!right) {
+    q.slips++; boop();
+    c.classList.remove('miss'); void c.offsetWidth; c.classList.add('miss');
+    setCat('pang', 'talk', '', $('.thrower'));
+    bubble('再聽聽看～'); setCat('fei', 'calm', 'wobble');
+    if (q.slips >= 2) app.querySelectorAll('.bcard').forEach(x => x.classList.toggle('glow', q.hits.includes(x.dataset.w) && !q.got.includes(x.dataset.w)));
+    setTimeout(() => { c._busy = false; }, 500);
+    seq([() => sayWord(c.dataset.w), 200, ...narrate({ t: '再聽聽看', ...FEI }, 150), () => saySym(q.t)]);
+    return;
+  }
+  q.got.push(c.dataset.w);
+  ding(); c.classList.add('hit');
+  setTimeout(() => c.remove(), 700);
+  app.querySelectorAll('.yarns i')[q.got.length - 1]?.classList.add('on');
+  setCat('pang', 'happy', 'hop', $('.thrower'));
+  if (q.got.length < q.hits.length) return seq([() => sayWord(c.dataset.w)]);
+  // wave cleared
+  q.locked = true;
+  const clean = q.slips === 0;
+  G.results[G.k] = clean;
+  record(q.t, clean);
+  G.newStickers.push(...unlockStickers());
+  const praise = pick(PRAISE);
+  bubble(praise); setCat('fei', 'smile', 'hop');
+  const g = G;
+  await seq([() => sayWord(c.dataset.w), 300, ...narrate({ t: praise, ...FEI }), 500]);
+  if (G === g && G.qs[G.k] === q && location.hash.startsWith('#/boss')) { G.k++; renderBoss(); }
+}
+
+// a pair is beaten when its two waves together had at most BOSS_SLIP slips
+function bossEnd() {
+  if (!G.over) {
+    const was = bossWon(G.leg - 1);
+    G.beat = [];
+    for (const p of new Set(G.qs.map(q => q.pair))) {
+      const slips = G.qs.filter(q => q.pair === p).reduce((n, q) => n + q.slips, 0);
+      if (slips <= BOSS_SLIP && !pairWon(p)) { S.map['zh:' + p.join('')] = Date.now(); G.beat.push(p); }
+    }
+    G.wonLeg = !was && bossWon(G.leg - 1);
+    save();
+  }
+  renderDone();
+}
+
 /* ============ game: 抓錯遊戲 (胖胖 reads a word — right, or as a near-miss; the child judges) ============ */
 // One-character words with a near-miss partner (貓 -> 馬 / 草 / 門). 胖胖's "reading" is that word's
 // recording, so a wrong reading is a real, reviewed word — no new syllable audio needed.
@@ -1281,25 +1477,30 @@ function renderDone() {
   save();
   const tired = day.rounds >= REST_AT;
   const fresh = G.newStickers;
+  // 大對決: pairs beaten this round; the last one of a leg lights up the next leg
+  const beat = G.beat || [], won = G.wonLeg, more = won && G.leg < LEGS.length;
   app.innerHTML = `
     <div class="done">
       <div class="duo small">${catEl('pang', 'happy', 'dance')}${catEl('fei', tired ? 'yawn' : 'smile')}</div>
       <h2>${msg}</h2>
       <div class="stars" aria-label="${stars} 顆星">${marks.map((r, i) => `<span class="${r ? 'on' : 'off'}" style="animation-delay:${i * 0.15}s">★</span>`).join('')}</div>
       <div class="recap">${G.qs.map((q, i) => `<span class="g-${q.t ? SYM[q.t].g : 'm'} ${G.cfg.game === 'memory' || G.results[i] ? 'ok' : 'no'}">${q.t || q.w}</span>`).join('')}</div>
+      ${won ? `<div class="stamp-new"><span class="stamp">🏆</span><span>第 ${G.leg} 關過關了！${more ? '<br>地圖上的下一關亮起來了' : ''}</span></div>`
+        : beat.length ? `<div class="stamp-new"><span class="stamp">🧶</span><span>打贏了 ${beat.map(p => p.join('／')).join('、')}！</span></div>` : ''}
       ${firstToday ? `<div class="stamp-new"><span class="stamp">${day.stamp}</span><span>今天的章蓋好了！</span></div>` : ''}
       ${fresh.length ? `<div class="new-stk"><p>拿到新貼紙！</p><div>${fresh.map((w, i) => `<span style="animation-delay:${0.6 + i * 0.12}s">${img(w)}</span>`).join('')}</div></div>` : ''}
       ${tired ? `<p class="rest">今天已經玩了 ${day.rounds} 輪，好厲害！<br>菲菲想睡覺了，我們明天再玩吧。</p>` : ''}
       <div class="btn-row">
         <button class="btn ${tired ? '' : 'primary '}big" data-act="again">再玩一次</button>
-        <a class="btn big" href="#/${G.cfg.focus ? 'sym/' + G.cfg.focus : 'learn'}">看圖卡</a>
+        <a class="btn big" href="#/${G.cfg.focus ? 'sym/' + G.cfg.focus : 'learn'}">${G.leg ? '看地圖' : '看圖卡'}</a>
         <a class="btn ${tired ? 'primary ' : ''}big" href="#/">回首頁</a>
       </div>
     </div>`;
-  ACT.again = () => G.cfg.game ? routes[G.cfg.game]() : startRound(G.cfg);
+  ACT.again = () => G.cfg.game ? routes[G.cfg.game](G.cfg.arg) : startRound(G.cfg);
   if (stars >= 3) setTimeout(() => tone([523, 659, 784, 1047], 0.16), 200);
   seq([700, ...narrate(
     { t: '耶！', ...PANG }, { t: msg, ...FEI },
+    won && { t: '過關了！', ...PANG }, !won && beat.length && { t: '打贏了！', ...PANG }, more && { t: '地圖上的下一關亮起來了。', ...FEI },
     firstToday && { t: '今天的練習完成了，蓋一個章！', ...FEI },
     fresh.length && { t: '拿到新貼紙了！', ...PANG }, ...fresh.flatMap(w => [() => sayWord(w), 150]),
     tired && { t: '菲菲想睡覺了，我們明天再玩吧。', ...FEI, rate: S.settings.rate * 0.85 },
@@ -1325,10 +1526,10 @@ function settings() {
       <label class="check"><input type="checkbox" id="narrate" ${S.settings.narrate ? 'checked' : ''}> 念出題目說明和鼓勵（菲菲、胖胖說話）</label>
     </div>
     <div class="panel">
-      <h3>泡泡的速度</h3>
+      <h3>泡泡、大對決的速度</h3>
       <div class="chips" role="group" aria-label="泡泡的速度">${Object.entries(BUB_SPEED).map(([k, v]) =>
         `<button class="chip" data-act="bubSpeed" data-k="${k}" aria-pressed="${S.settings.bubbles === k}">${v.name}</button>`).join('')}</div>
-      <p class="note">泡泡從下面飄到上面要幾秒。孩子常常來不及戳，就調慢一點。</p>
+      <p class="note">泡泡往上飄、大對決輸送帶跑的速度。孩子常常來不及點，就調慢一點。</p>
     </div>
     <div class="panel">
       <h3>練習紀錄</h3>

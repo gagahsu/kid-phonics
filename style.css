@@ -455,3 +455,69 @@ img { display: block; max-width: 100%; }
 .verdict .opt { font-size: 24px; }
 .heard { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; color: var(--ink); }
 .heard img { width: 56px; height: 56px; object-fit: contain; }
+
+/* 闖關地圖: islands along a dashed road, 5 legs; a leg not reached yet stays in the fog */
+.leg { margin-bottom: 8px; }
+.fog-note { margin: 0 4px 4px; font-size: 14px; color: var(--ink-soft); }
+.path { position: relative; margin: 0 8px; }
+.road { position: absolute; inset: 0; width: 100%; height: 100%; }
+.road path { fill: none; stroke: #E3C892; stroke-width: 5; stroke-dasharray: 2 12; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.isle {
+  position: absolute; transform: translate(-50%, -50%); width: 72px; height: 66px; display: grid; place-items: center;
+  border-radius: 50% 50% 46% 54% / 56% 52% 48% 44%; text-decoration: none;
+  font-family: var(--kai); font-size: 36px; font-weight: 700; line-height: 1;
+  box-shadow: 0 6px 0 #E8D2A6, 0 10px 18px rgba(31, 42, 68, .1);
+}
+.isle:active { transform: translate(-50%, calc(-50% + 3px)); }
+.isle .dots { bottom: 7px; }
+.isle.learned.g-i { background: var(--gi); color: #fff; }
+.isle.learned.g-m { background: var(--gm); color: #fff; }
+.isle.learned.g-f { background: var(--gf); color: #fff; }
+.isle.learned::after { content: "🚩"; position: absolute; top: -18px; right: -4px; font-size: 22px; }
+.isle .here { position: absolute; bottom: -8px; pointer-events: none; }
+.isle .here.r { left: 70px; }
+.isle .here.l { right: 70px; }
+.isle .here .cat { width: 48px; animation: bob 2.4s ease-in-out infinite; }
+.isle.boss {
+  width: 150px; height: 84px; grid-template-rows: auto auto auto; align-content: center; gap: 1px;
+  background: var(--paper); color: var(--ink); border: 3px solid var(--yellow);
+}
+.isle.boss .b-ico { font-size: 22px; }
+.isle.boss .b-t { font-size: 20px; }
+.isle.boss .b-p { font-family: var(--ui); font-size: 12px; font-weight: 400; color: var(--ink-soft); padding: 0 8px; text-align: center; line-height: 1.2; }
+.isle.boss.won { background: #FFF3CC; }
+.leg.fog .path { filter: grayscale(.85); opacity: .5; }
+.isle.boss .b-p i { font-style: normal; }
+.isle.boss .b-p i.ok { color: var(--good); font-weight: 700; }
+.isle.boss .b-p i.ok::after { content: "✓"; }
+
+/* 大對決: picture cards on a conveyor belt, 胖胖 throws yarn at the ones with the sound */
+.boss-target { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 6px 0 14px; }
+.big-sym.boss-sym { width: 104px; height: 104px; font-size: 64px; border-radius: 26px; }
+.yarns { display: flex; gap: 6px; }
+.yarns i { width: 26px; height: 26px; border-radius: 50%; border: 3px dashed #E3C892; }
+.yarns i.on { border: 0; background: radial-gradient(circle at 35% 35%, #FF9FAE, #E0566B); box-shadow: inset 0 0 0 3px rgba(255,255,255,.35); }
+.belt {
+  position: relative; height: 132px; margin: 0 -16px; overflow: hidden; touch-action: none;
+  background: repeating-linear-gradient(90deg, #5B6680 0 22px, #4A546C 22px 44px);
+  border-block: 8px solid #3B4359;
+}
+.bcard {
+  position: absolute; left: 0; top: 10px; width: 108px; height: 108px; padding: 6px; border: 0;
+  border-radius: 18px; background: var(--paper); box-shadow: 0 4px 0 rgba(0,0,0,.25); will-change: transform;
+}
+.bcard img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.bcard.glow { box-shadow: 0 0 0 5px var(--yellow), 0 4px 0 rgba(0,0,0,.25); }
+.bcard.miss img { animation: shake .4s ease; }
+.bcard.hit { pointer-events: none; animation: wrapped .7s ease forwards; }   /* scale / translate: transform is the belt's */
+.bcard.hit::after {
+  content: ""; position: absolute; inset: 22px; border-radius: 50%;
+  background: repeating-linear-gradient(35deg, #E0566B 0 5px, #FF9FAE 5px 10px);
+}
+@keyframes wrapped { 60% { scale: .7; opacity: 1; } to { translate: 0 -40px; scale: .3; opacity: 0; } }
+.thrower { display: flex; justify-content: center; margin-top: 10px; }
+.thrower .cat { width: 96px; }
+.yarn {
+  position: fixed; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; z-index: 50; pointer-events: none;
+  background: repeating-linear-gradient(35deg, #E0566B 0 4px, #FF9FAE 4px 8px); box-shadow: 0 2px 4px rgba(0,0,0,.25);
+}
