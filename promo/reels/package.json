@@ -1,0 +1,24 @@
+{
+  "name": "kid-phonics-reels",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Reel out/reel-9x16.mp4",
+    "render2": "remotion render Reel2 out/reel2-9x16.mp4",
+    "render3": "remotion render Reel3 out/reel3-9x16.mp4",
+    "qr": "node scripts/qr.mjs",
+    "still": "remotion still Reel out/still.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.300",
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.300",
+    "typescript": "^5.6.3"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "qrcode": "^1.5.4"
+  }
+}
