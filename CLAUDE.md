@@ -1,6 +1,6 @@
 # kid-phonics
 
-給幼兒學注音的靜態網站（`index.html`、`app.js`、`style.css`，免建置）。資料在 `data/zhuyin.json`，
+給幼兒學注音、英文字母的靜態網站（`index.html`、`app.js`、`style.css`，免建置）。資料在 `data/zhuyin.json`、`data/abc.json`，
 工具腳本在 `tools/`（Python，用 `py` 執行，需要 ffmpeg）。說明見 `README.md`，進度見 `ROADMAP.md`。
 `work/` 不進版控，裡面的檔案都可以重新產生。
 

@@ -1,4 +1,4 @@
-// 發音樂園 — 注音 (ABC / 50 音 later). No build step: plain ES module + data/*.json.
+// 發音樂園 — 注音 and ABC (50 音 later). No build step: plain ES module + data/*.json.
 import { parseSyl, sylParts, TONE_MARK } from './syllable.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -9,17 +9,26 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 /* ============ data ============ */
-let Z;           // data/zhuyin.json
-let ART = {};    // data/art.json: slug -> {cat, desc}
+// Everything below works on the current language's data: Z / SYM / STICKERS are swapped by useLang().
+let LANG = 'zh'; // 'zh' (注音) | 'en' (ABC)
+const LP = () => LANG + ':';   // prefix of every per-language key in S (stats, seen, stickers, spell, map)
+const DATA = {}; // lang -> its data/<lang>.json
+let Z;           // DATA[LANG]
+let ART = {};    // data/art.json: slug -> {cat, desc, emoji?}
 let SYM = {};    // symbol -> {s, g, say, words}
 let STICKERS = []; // one per picture slug: {art, word, cat, syms}
-const GROUP_NAME = { i: '聲母', m: '介音', f: '韻母' };
+let GROUP_NAME = {};   // Z.groups: zh {i: 聲母, m: 介音, f: 韻母}, en {c: 子音, v: 母音}
+const isEn = () => LANG === 'en';
 const CAT_NAME = { animal: '動物', food: '食物', plant: '植物', vehicle: '交通工具', person: '家人', body: '身體', object: '東西', sky: '天空', scene: '大自然' };
 const STAMPS = ['🐾', '⭐', '🌸', '🍓', '🐟', '🎈', '🌈', '🍀', '🐾', '🧶'];
 const ROUND = 5;
 // sounds kids typically mix up — used as distractors so practice targets real confusions
 const CONFUSE = ['ㄅㄆ', 'ㄉㄊ', 'ㄍㄎ', 'ㄓㄗ', 'ㄔㄘ', 'ㄕㄙ', 'ㄈㄏ', 'ㄋㄌ', 'ㄐㄑㄒ', 'ㄓㄐ', 'ㄔㄑ', 'ㄕㄒ',
   'ㄖㄌ', 'ㄣㄥ', 'ㄢㄤ', 'ㄛㄜ', 'ㄝㄟ', 'ㄞㄟ', 'ㄠㄡ', 'ㄧㄩ', 'ㄨㄩ', 'ㄛㄡ', 'ㄜㄦ'];
+// ABC (ROADMAP 4.4): voiced / voiceless pairs, l/r and w/v (hard for Taiwanese kids), the short vowels.
+// c and k are one sound (abc.json sameSound): never both in one question, so they aren't a pair here.
+const CONFUSE_EN = ['bp', 'dt', 'gk', 'cg', 'fv', 'mn', 'sz', 'lr', 'wv', 'ae', 'ei', 'ou', 'ao', 'ua'];
+const confuseList = () => isEn() ? CONFUSE_EN : CONFUSE;
 
 /* ============ storage ============ */
 const STORE = 'kidphonics.v1';
@@ -29,17 +38,20 @@ S.settings.narrate ??= true;           // cats read instructions / praise aloud
 S.settings.bubbles ??= 'slow';         // 泡泡 rising speed: slow | mid | fast
 S.stats ??= {};                        // 'zh:ㄅ' -> {ok, bad, streak}
 S.seen ??= {};                         // 'zh:ㄅ' -> first time its page was opened (ms)
-S.stickers ??= {};                     // picture slug -> unlocked at (ms); never taken back
+S.stickers ??= {};                     // 'zh:cat' (lang:picture slug) -> unlocked at (ms); never taken back
 S.days ??= {};                         // 'YYYY-MM-DD' (local) -> {rounds, stamp}
 S.spell ??= {};                        // 'zh:貓' -> {ok, round}: 拼拼看 first-try spellings, one per round
 S.map ??= {};                          // 'zh:ㄅㄆ' -> 闖關地圖: that pair first beaten in a 大對決 at (ms)
 S.settings.learnView ??= 'map';
 S.settings.kidName ??= '';             // printed on 獎狀
+S.settings.lang ??= 'zh';              // 'zh' | 'en': the language the whole site is showing
 S.settings.mic ??= '';                 // '' (not asked yet) | 'ok' | 'denied' — denied hides the 🎤 buttons        // 認識符號: 'map' (闖關地圖) | 'grid'
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* private mode */ } };
-const seenSyms = () => Z.symbols.filter(x => S.seen['zh:' + x.s]).map(x => x.s);
-function markSeen(s) { if (!S.seen['zh:' + s]) { S.seen['zh:' + s] = Date.now(); save(); } }
-const stat = s => (S.stats['zh:' + s] ??= { ok: 0, bad: 0, streak: 0 });
+// stickers used to be keyed by slug alone (注音 only): those are 注音 stickers
+for (const k of Object.keys(S.stickers)) if (!k.includes(':')) { S.stickers['zh:' + k] ??= S.stickers[k]; delete S.stickers[k]; }
+const seenSyms = () => Z.symbols.filter(x => S.seen[LP() + x.s]).map(x => x.s);
+function markSeen(s) { if (!S.seen[LP() + s]) { S.seen[LP() + s] = Date.now(); save(); } }
+const stat = s => (S.stats[LP() + s] ??= { ok: 0, bad: 0, streak: 0 });
 const level = s => Math.min(3, stat(s).streak);   // 0..3 dots; 3 = learned
 function record(s, firstTry) {
   const st = stat(s);
@@ -47,12 +59,14 @@ function record(s, firstTry) {
   save();
 }
 // the one way a sticker gets into the book (learned symbol, 拼拼看); true if it's new. Caller saves.
-function giveSticker(art) { if (S.stickers[art]) return false; S.stickers[art] = Date.now(); return true; }
+// stickers are per language (ROADMAP 1.2): the same picture is one sticker in 注音 and another in ABC
+const hasStk = art => !!S.stickers[LP() + art];
+function giveSticker(art) { if (hasStk(art)) return false; S.stickers[LP() + art] = Date.now(); return true; }
 // a learned symbol unlocks the pictures of its words; returns the words newly unlocked
 function unlockStickers() {
   const fresh = [];
   for (const x of Z.symbols) if (level(x.s) === 3)
-    for (const w of x.words) if (giveSticker(Z.words[w].art)) fresh.push(w);
+    for (const w of x.words) if (hasPic(w) && giveSticker(Z.words[w].art)) fresh.push(w);
   if (fresh.length) save();
   return fresh;
 }
@@ -72,6 +86,8 @@ function voiceFor() {
   const zh = zhVoices();
   return zh.find(v => /zh[-_]TW/i.test(v.lang)) || zh.find(v => /Hant/i.test(v.lang)) || zh[0] || null;
 }
+// ABC fallback voice: American English (ROADMAP 4.0 ③)
+const enVoice = () => { const en = voices.filter(v => /^en/i.test(v.lang)); return en.find(v => /en[-_]US/i.test(v.lang)) || en[0] || null; };
 // Recorded clips play through one <audio> element: unlike Web Audio it isn't muted by the
 // iPhone/iPad silent switch. Resolves true (played), false (failed -> caller falls back) or 'stop'.
 const player = (() => { try { const a = new Audio(); a.preload = 'auto'; return a; } catch { return null; } })();
@@ -113,8 +129,8 @@ function speak(text, o = {}) {
     stopClip();
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-TW';
-    const v = voiceFor();
+    u.lang = o.lang === 'en' ? 'en-US' : 'zh-TW';
+    const v = o.lang === 'en' ? enVoice() : voiceFor();
     if (v) u.voice = v;
     u.rate = o.rate ?? S.settings.rate;
     u.pitch = o.pitch ?? 1;
@@ -141,18 +157,36 @@ async function seq(steps) {
   return id === seqId;
 }
 const hush = () => { seqId++; stopClip(); if (HAS_TTS) speechSynthesis.cancel(); };
-// recording first; TTS reads the representative character (ㄅ -> 玻) only if the clip fails
-async function saySym(s) {
+// 注音: recording first; TTS reads the representative character (ㄅ -> 玻) only if the clip fails.
+// The cats' name lessons (ㄆ ㄤˋ 胖) call this directly, whatever language the site is showing.
+async function zhSym(s) {
   if (HAS_TTS) speechSynthesis.cancel();
   const r = await playClip(symUrl(s));
-  if (r === false) await speak(SYM[s].say);
+  if (r === false) await speak(DATA.zh.symbols.find(x => x.s === s).say);
 }
-// Gemini TTS word recordings (tools/gemini_tts.py), named by the characters' code points: 筆 -> 7b46.mp3
-const wordUrl = w => `assets/audio/zh/word/${[...w].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
+// ABC: assets/audio/en/name/a.mp3 (the letter's name) and sound/a.mp3 (its sound, ROADMAP 4.2).
+// No device-TTS stand-in for a letter's sound (TTS says "buh" or the name): sayLetterSound -> false.
+async function sayLetterName(s) {
+  if (HAS_TTS) speechSynthesis.cancel();
+  if (await playClip(`assets/audio/en/name/${s}.mp3`) === false) await speak(s.toUpperCase() + '.', { lang: 'en' });
+}
+async function sayLetterSound(s) {
+  if (HAS_TTS) speechSynthesis.cancel();
+  return await playClip(`assets/audio/en/sound/${s}.mp3`) !== false;
+}
+// a symbol's own sound: 注音 recording; ABC the letter's sound, its name until that is recorded
+async function saySym(s) {
+  if (!isEn()) return zhSym(s);
+  if (!await sayLetterSound(s)) await sayLetterName(s);
+}
+// Gemini TTS word recordings (tools/gemini_tts.py). 注音 named by the characters' code points (筆 -> 7b46.mp3),
+// ABC by the word itself (apple.mp3)
+const wordUrl = w => isEn() ? `assets/audio/en/word/${w}.mp3`
+  : `assets/audio/zh/word/${[...w].map(c => c.codePointAt(0).toString(16)).join('-')}.mp3`;
 // every example word has one voice; device TTS only if the clip fails
 async function sayWord(w, volume = 1) {
   if (HAS_TTS) speechSynthesis.cancel();
-  if (await playClip(wordUrl(w), volume) === false) await speak(w, { volume });
+  if (await playClip(wordUrl(w), volume) === false) await speak(w, { volume, lang: LANG });
 }
 // 抓錯遊戲: the words 胖胖 reads, in his own voice (Gemini Puck); the example-word clip if one is missing
 async function sayPangWord(w) {
@@ -205,12 +239,28 @@ function zyCol(syl, hi) {
     `<span class="zl">${letters.map(c => `<b class="${c === hi ? 'hi' : ''}">${c}</b>`).join('')}</span>` +
     `${tn ? `<i class="tn">${tn}</i>` : ''}</span>`;
 }
+// a word with its sounds: 注音 beside each character; ABC the letters, the taught one in red
+// (the first one it starts with — or, for x (pos: end), the last)
 function ruby(word, hi) {
+  if (isEn()) {
+    const at = !hi ? -1 : Z.words[word].pos === 'end' ? word.lastIndexOf(hi) : word.indexOf(hi);
+    return `<span class="ew" aria-label="${esc(word)}">${[...word].map((c, i) => `<b class="${i === at ? 'hi' : ''}">${c}</b>`).join('')}</span>`;
+  }
   const syl = Z.words[word].zy.split(' ');
   return `<span class="zw" aria-label="${esc(word)}">${[...word].map((ch, i) =>
     `<span class="zc"><span class="ch">${ch}</span>${zyCol(syl[i], hi)}</span>`).join('')}</span>`;
 }
-const img = (word, cls = '') => `<img class="${cls}" src="assets/img/${Z.words[word].art}.webp" alt="${esc(word)}" draggable="false">`;
+// Pictures not drawn yet (new ABC words, ROADMAP 4.1) show their art.json emoji instead, as a small SVG so
+// that every picture style and animation still applies; words with neither are left out (hasPic).
+let DRAWN = null;   // slugs whose assets/img/<slug>.webp exists — only checked for ABC (see useLang)
+const drawn = a => !DRAWN || DRAWN.has(a);
+const hasPic = w => drawn(Z.words[w].art) || !!ART[Z.words[w].art]?.emoji;
+const emojiSrc = e => 'data:image/svg+xml,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50" y="54" font-size="78" text-anchor="middle" dominant-baseline="middle">${e}</text></svg>`);
+const img = (word, cls = '') => { const a = Z.words[word].art;
+  return `<img class="${cls}" src="${drawn(a) ? `assets/img/${a}.webp` : emojiSrc(ART[a]?.emoji || '❔')}" alt="${esc(word)}" draggable="false">`; };
+// how a symbol is written on cards and tiles: ABC shows both cases (Aa); answer buttons use lower case
+const glyph = s => isEn() ? `${s.toUpperCase()}${s}` : s;
 const dots = s => `<span class="dots">${[0, 1, 2].map(i => `<i class="${i < level(s) ? 'on' : ''}"></i>`).join('')}</span>`;
 
 /* ============ cats: 胖胖 (tabby & white, 麒麟尾) and 菲菲 (Russian Blue) ============ */
@@ -332,7 +382,7 @@ function route() {
   hush();
   recBar('');
   const [r = '', arg] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
-  (routes[r] || home)(arg);
+  (isEn() && ZH_ONLY.has(r) ? home : routes[r] || home)(arg);
   window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', route);
@@ -351,11 +401,12 @@ const LOUD = '<span class="tag loud">📣 要開口</span>';
 function home() {
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const today = S.days[dayKey()];
-  const got = STICKERS.filter(x => S.stickers[x.art]).length;
+  const got = STICKERS.filter(x => hasStk(x.art)).length;
   const memLeft = Math.max(0, MEM_MIN - seenSyms().length), spellLeft = Math.max(0, SPELL_MIN - learned),
     bubLeft = Math.max(0, BUB_MIN - learned), catchLeft = Math.max(0, CATCH_MIN - learned),
     teachLeft = Math.max(0, TEACH_MIN - spellCount());
-  const greet = learned ? `我們已經學會 <b>${learned}</b> 個注音了！<br>今天也一起練習吧～` : '嗨！我是胖胖。<br>我還不太會注音，你可以陪我練習嗎？';
+  const what = isEn() ? '英文字母' : '注音';
+  const greet = learned ? `我們已經學會 <b>${learned}</b> 個${what}了！<br>今天也一起練習吧～` : `嗨！我是胖胖。<br>我還不太會${what}，你可以陪我練習嗎？`;
   app.innerHTML = `
     <div class="bar"><span style="flex:1"></span><a class="icon-btn" href="#/settings" aria-label="家長設定">⚙️</a></div>
     <section class="hero">
@@ -367,8 +418,8 @@ function home() {
       </div>
     </section>
     <div class="langs" role="group" aria-label="選擇語言">
-      <button class="lang" aria-pressed="true">注音</button>
-      <button class="lang" disabled>ABC<small>準備中</small></button>
+      <button class="lang" data-act="lang" data-l="zh" aria-pressed="${!isEn()}">注音</button>
+      <button class="lang" data-act="lang" data-l="en" aria-pressed="${isEn()}">ABC</button>
       <button class="lang" disabled>あいう<small>準備中</small></button>
     </div>
     <a class="today-btn${today ? ' done' : ''}" href="#/practice/today">
@@ -376,14 +427,14 @@ function home() {
       <span><span class="t">今天的練習</span><br><span class="s">${today ? '今天的章蓋好了！想玩可以再玩' : `玩一輪 ${ROUND} 題，就能蓋一個章`}</span></span>
     </a>
     <nav class="menu">
-      <a href="#/learn"><span class="ico">👀</span><span class="mt"><span class="t">認識符號</span><br><span class="s">看圖卡、聽發音，37 個注音符號</span></span>${QUIET}</a>
+      <a href="#/learn"><span class="ico">👀</span><span class="mt"><span class="t">${isEn() ? '認識字母' : '認識符號'}</span><br><span class="s">看圖卡、聽發音，${Z.symbols.length} 個${isEn() ? '英文字母' : '注音符號'}</span></span>${QUIET}</a>
       <a href="#/practice"><span class="ico">👂</span><span class="mt"><span class="t">聽音練習</span><br><span class="s">${seenSyms().length
         ? `練習學過的 ${seenSyms().length} 個符號，一輪 ${ROUND} 題` : '先學幾個符號，再來練習'}</span></span>${QUIET}</a>
       <a href="#/stickers"><span class="ico">🎁</span><span class="mt"><span class="t">我的貼紙簿</span><br><span class="s">已收集 ${got} / ${STICKERS.length} 張</span></span></a>
-      ${micOK() ? `<a href="#/myvoice"><span class="ico">🎙️</span><span class="mt"><span class="t">我的聲音</span><br><span class="s">聽聽自己念的注音和詞</span></span></a>` : ''}
+      ${micOK() ? `<a href="#/myvoice"><span class="ico">🎙️</span><span class="mt"><span class="t">我的聲音</span><br><span class="s">聽聽自己念的${isEn() ? '字母' : '注音'}和詞</span></span></a>` : ''}
     </nav>
     <h3 class="group-h">遊戲</h3>
-    <nav class="menu games">
+    ${isEn() ? '<p class="note">ABC 的遊戲還在準備中，先玩「認識字母」和「聽音練習」吧！遊戲可以切回「注音」玩。</p>' : `<nav class="menu games">
       ${sortPairs().length
         ? `<a href="#/sort"><span class="ico">🧺</span><span class="mt"><span class="t">分類籃</span><br><span class="s">把圖片放進對的籃子，分清楚很像的音</span></span>${QUIET}</a>`
         : `<a href="#/sort" class="locked" data-act="lockSort"><span class="ico">🔒</span><span class="mt"><span class="t">分類籃</span><br><span class="s">先認識 ${sortHint().join(' 和 ')}，就能玩</span></span>${QUIET}</a>`}
@@ -402,22 +453,23 @@ function home() {
       ${teachLeft
         ? `<a href="#/teach" class="locked" data-act="lockTeach"><span class="ico">🔒</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">拼拼看再拼對 ${teachLeft} 個字，就能玩</span></span>${LOUD}</a>`
         : `<a href="#/teach"><span class="ico">🧑‍🏫</span><span class="mt"><span class="t">教胖胖</span><br><span class="s">當胖胖的老師，念注音給牠聽</span></span>${LOUD}</a>`}
-    </nav>
+    </nav>`}
     ${calendar()}
     <div class="progress">
-      <div class="row"><span>學會的符號（連續答對 3 次）</span><b>${learned} / ${Z.symbols.length}</b></div>
+      <div class="row"><span>學會的${isEn() ? '字母' : '符號'}（連續答對 3 次）</span><b>${learned} / ${Z.symbols.length}</b></div>
       <div class="meter"><i style="width:${learned / Z.symbols.length * 100}%"></i></div>
     </div>`;
+  ACT.lang = el => setLang(el.dataset.l);
   const bounce = el => { const c = el.querySelector('.cat'); c.classList.remove('hop'); void c.offsetWidth; c.classList.add('hop'); };
   // name = first spelling lesson: ㄆ ㄤˋ 胖 / ㄈ ㄟ 菲
   ACT.hiPang = el => {
     bounce(el);
-    seq([{ t: '嗨！我是胖胖。', ...PANG }, () => saySym('ㄆ'), 150, () => saySym('ㄤ'), 150, { t: '胖！', ...PANG },
+    seq([{ t: '嗨！我是胖胖。', ...PANG }, () => zhSym('ㄆ'), 150, () => zhSym('ㄤ'), 150, { t: '胖！', ...PANG },
       { t: learned ? '謝謝你陪我練習！今天也一起學注音吧！' : '我還不太會注音，你可以陪我練習嗎？', ...PANG }]);
   };
   ACT.hiFei = el => {
     bounce(el);
-    seq([{ t: '我是菲菲。', ...FEI }, () => saySym('ㄈ'), 150, () => saySym('ㄟ'), 150, { t: '菲。', ...FEI },
+    seq([{ t: '我是菲菲。', ...FEI }, () => zhSym('ㄈ'), 150, () => zhSym('ㄟ'), 150, { t: '菲。', ...FEI },
       { t: today ? '今天的章蓋好了，好棒。' : '每天玩一輪，就能蓋一個章喔。', ...FEI }]);
   };
   ACT.lockSort = () => {
@@ -463,13 +515,15 @@ function stkPages() {
 }
 
 function stickers() {
-  const got = STICKERS.filter(x => S.stickers[x.art]).length;
+  const got = STICKERS.filter(x => hasStk(x.art)).length;
   const pages = stkPages();
   stkPage = Math.min(stkPage, pages.length - 1);
   app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的貼紙簿</h2>
       <span class="stk-count">${got} / ${STICKERS.length}</span></div>
     <div class="feed">${catEl('pang')}<div class="bubble" id="bubble">${got
-      ? '把貼紙拖給胖胖，或點一下送給牠！' : '學會注音符號（★），就能拿到貼紙送給胖胖。'}</div></div>
+      ? '把貼紙拖給胖胖，或點一下送給牠！' : `學會${isEn() ? '英文字母' : '注音符號'}（★），就能拿到貼紙送給胖胖。`}</div></div>
+    <div class="chips" role="group" aria-label="哪一本貼紙簿">${Object.keys(DATA).map(l =>
+      `<button class="chip" data-act="stkLang" data-l="${l}" aria-pressed="${l === LANG}">${LANG_NAME[l]}</button>`).join('')}</div>
     <div class="stk-tabs" role="tablist">${[...new Set(pages.map(p => p.c))].map(c =>
       `<button class="stk-tab" role="tab" data-act="stkTab" data-c="${c}" aria-label="${CAT_NAME[c] || c}">${CAT_ICON[c] || '📦'}</button>`).join('')}</div>
     <div class="stk-book"></div>
@@ -478,6 +532,7 @@ function stickers() {
       <span id="stkNo"></span>
       <button class="icon-btn" data-act="stkTurn" data-d="1" aria-label="下一頁">›</button>
     </div>`;
+  ACT.stkLang = el => { stkPage = 0; setLang(el.dataset.l); };
   const turn = d => { const k = (stkPage + d + pages.length) % pages.length; if (k !== stkPage) { stkPage = k; showPage(d); } };
   ACT.stkTurn = el => turn(+el.dataset.d);
   ACT.stkTab = el => { const k = pages.findIndex(p => p.c === el.dataset.c); if (k !== stkPage) { const d = k > stkPage ? 1 : -1; stkPage = k; showPage(d); } };
@@ -492,10 +547,10 @@ function stickers() {
   });
 
   function showPage(dir = 0) {
-    const pg = pages[stkPage], have = pg.all.filter(x => S.stickers[x.art]).length;
+    const pg = pages[stkPage], have = pg.all.filter(x => hasStk(x.art)).length;
     book.innerHTML = `<div class="stk-page${dir ? (dir > 0 ? ' in-r' : ' in-l') : ''}">
       <h3 class="group-h">${CAT_ICON[pg.c] || ''} ${CAT_NAME[pg.c] || pg.c}<small>${have} / ${pg.all.length}${pg.n > 1 ? `・第 ${pg.i + 1} 頁` : ''}</small></h3>
-      <div class="stk-grid">${pg.list.map(x => S.stickers[x.art]
+      <div class="stk-grid">${pg.list.map(x => hasStk(x.art)
         ? `<button class="stk" style="--tilt:${[...x.art].reduce((n, c) => n + c.charCodeAt(0), 0) % 9 - 4}deg" data-w="${esc(x.word)}" data-c="${x.cat}" aria-label="把${esc(x.word)}送給胖胖">${img(x.word)}<span class="cap n${[...x.word].length}">${ruby(x.word)}</span></button>`
         : `<button class="stk lock" data-act="stkLock" data-s="${x.syms[0]}" aria-label="還沒拿到，學會 ${x.syms[0]} 就能拿到">${img(x.word)}<span class="need g-${SYM[x.syms[0]].g}">${x.syms[0]}</span></button>`).join('')}</div>
     </div>`;
@@ -541,6 +596,7 @@ function feedPang(el) {
 
 /* ============ learn: all symbols (闖關地圖 or the plain grid) ============ */
 function learn() {
+  if (isEn()) return learnEn();
   const map = S.settings.learnView === 'map';
   const groups = ['i', 'm', 'f'].map(g => {
     const list = Z.symbols.filter(x => x.g === g);
@@ -567,7 +623,7 @@ function learn() {
 const LEGS = ['ㄅㄆㄇㄈㄉㄊㄋ', 'ㄌㄍㄎㄏㄐㄑㄒ', 'ㄓㄔㄕㄖㄗㄘㄙ', 'ㄧㄨㄩㄚㄛㄜㄝ', 'ㄞㄟㄠㄡㄢㄣㄤㄥㄦ'].map(l => [...l]);
 const legOf = s => LEGS.findIndex(l => l.includes(s));
 const legPairs = i => PAIRS.filter(p => Math.max(...p.map(legOf)) === i);
-const pairWon = p => !!S.map['zh:' + p.join('')];
+const pairWon = p => !!S.map[LP() + p.join('')];
 const bossWon = i => legPairs(i).every(pairWon);
 const MAP_X = [50, 78, 50, 22], MAP_ROW = 86, MAP_TOP = 50;
 
@@ -599,6 +655,16 @@ function mapLegs() {
   }).join('');
 }
 
+// ABC: A–Z in one grid (the order of school and the ABC song), vowels and consonants in their colors.
+// The map comes with ABC's games (ROADMAP 4.5 E4).
+function learnEn() {
+  app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>認識字母</h2></div>
+    <p class="legend">
+      <span class="tile-key g-v">母音</span><span class="tile-key g-c">子音</span>
+      <span class="sep"></span><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span>學會了 <b>★</b></p>
+    <div class="tiles">${Z.symbols.map(x => `<a class="tile g-${x.g}${level(x.s) === 3 ? ' learned' : ''}" href="#/sym/${x.s}" aria-label="${x.s}">${glyph(x.s)}${dots(x.s)}</a>`).join('')}</div>`;
+}
+
 /* ============ one symbol ============ */
 let playToken = 0;
 function symPage(s) {
@@ -610,29 +676,31 @@ function symPage(s) {
     <div class="bar"><a class="icon-btn" href="#/learn" aria-label="回符號列表">←</a><h2>${GROUP_NAME[x.g]}</h2></div>
     <div class="sym-head">
       <a class="icon-btn nav-btn" href="#/sym/${prev}" aria-label="上一個 ${prev}">‹</a>
-      <button class="big-sym g-${x.g}" data-act="saySym" aria-label="聽 ${s} 的聲音">${s}<span class="spk">🔊</span></button>
+      <button class="big-sym g-${x.g}" data-act="saySym" aria-label="聽 ${s} 的聲音">${glyph(s)}<span class="spk">🔊</span></button>
       <a class="icon-btn nav-btn" href="#/sym/${next}" aria-label="下一個 ${next}">›</a>
     </div>
     <div class="say-all"><button class="btn" data-act="sayAll">▶ 全部聽一次</button>${micOK()
       ? `<button class="btn mic" data-act="rec" data-k="sym:${s}">🎤 我也說說看</button>` : ''}</div>
-    <div class="words">${x.words.map(w => `<div class="card-wrap"><button class="card" data-act="sayWord" data-w="${esc(w)}">${img(w)}${ruby(w, s)}</button>${micOK()
+    <div class="words">${x.words.filter(hasPic).map(w => `<div class="card-wrap"><button class="card" data-act="sayWord" data-w="${esc(w)}">${img(w)}${ruby(w, s)}</button>${micOK()
       ? `<button class="mic-mini" data-act="rec" data-k="word:${esc(w)}" aria-label="我也說說看：${esc(w)}">🎤</button>` : ''}</div>`).join('')}</div>
     <div class="btn-row"><a class="btn primary big" href="#/practice/${s}">練習 ${s} 👂</a></div>`;
   markSeen(s);
-  ACT.saySym = async el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); playToken++; await saySym(s); };
+  // ABC: the letter's name, then its sound (ROADMAP 4.0 ①: both taught, the sound is what's tested)
+  const sayIt = () => isEn() ? seq([() => sayLetterName(s), 350, () => sayLetterSound(s)]) : saySym(s);
+  ACT.saySym = async el => { el.classList.remove('playing'); void el.offsetWidth; el.classList.add('playing'); playToken++; await sayIt(); };
   ACT.sayWord = async el => { playToken++; flash(el); await sayWord(el.dataset.w); };
   ACT.rec = el => { playToken++; sayAfterMe(el); };
   ACT.sayAll = async () => {
     const my = ++playToken;
     const big = $('.big-sym'); big.classList.add('playing');
-    await saySym(s); big.classList.remove('playing');
+    await sayIt(); big.classList.remove('playing');
     for (const card of app.querySelectorAll('.card')) {
       if (my !== playToken) return;
       await sleep(250);
       flash(card); await sayWord(card.dataset.w);
     }
   };
-  setTimeout(() => saySym(s), 250);
+  setTimeout(sayIt, 250);
 }
 /* ============ 錄音跟讀: 🎤 我也說說看, and 我的聲音 ============ */
 // Record 3 s on the device, then play the example and the child's own try back to back. No scoring
@@ -716,7 +784,7 @@ async function sayAfterMe(el) {
       if (here()) symPage(decodeURIComponent(page.split('/')[2]));   // the 🎤 buttons are gone now
       return;
     }
-    await voicePut('zh:' + k, { k, blob, at: Date.now() });
+    await voicePut(LP() + k, { k, lang: LANG, blob, at: Date.now() });
     if (!here()) return recBar('');
     recBar('<b>👂 範例</b>');
     await seq([() => voiceExample(k), 300, ...narrate({ t: '這是你的聲音', ...FEI }, 150)]);
@@ -736,7 +804,7 @@ async function sayAfterMe(el) {
 // #/myvoice: every saved take, symbols first (standard order), then words; example and own voice side by side
 async function myvoice() {
   app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的聲音</h2></div>`;
-  const all = await voiceAll();
+  const all = (await voiceAll()).filter(v => (v.lang || 'zh') === LANG);
   if (location.hash !== '#/myvoice') return;
   const order = Z.symbols.map(x => x.s), words = Object.keys(Z.words);
   const syms = all.filter(v => v.k.startsWith('sym:') && SYM[v.k.slice(4)])
@@ -746,14 +814,14 @@ async function myvoice() {
   const row = v => {
     const isSym = v.k.startsWith('sym:'), it = v.k.slice(isSym ? 4 : 5);
     return `<div class="vrow">
-      ${isSym ? `<span class="vsym g-${SYM[it].g}">${it}</span>` : `<span class="vword">${img(it)}${ruby(it)}</span>`}
+      ${isSym ? `<span class="vsym g-${SYM[it].g}">${glyph(it)}</span>` : `<span class="vword">${img(it)}${ruby(it)}</span>`}
       <span class="vbtns"><button class="btn" data-act="vEx" data-k="${esc(v.k)}">👂 範例</button>
       <button class="btn primary" data-act="vMine" data-k="${esc(v.k)}">🙂 我的</button></span>
     </div>`;
   };
   app.innerHTML = `<div class="bar"><a class="icon-btn" href="#/" aria-label="回首頁">🏠</a><h2>我的聲音</h2></div>
     ${syms.length || ws.length
-      ? `${syms.length ? `<h3 class="group-h">注音符號<small>${syms.length} 個</small></h3>${syms.map(row).join('')}` : ''}
+      ? `${syms.length ? `<h3 class="group-h">${isEn() ? '字母' : '注音符號'}<small>${syms.length} 個</small></h3>${syms.map(row).join('')}` : ''}
         ${ws.length ? `<h3 class="group-h">詞<small>${ws.length} 個</small></h3>${ws.map(row).join('')}` : ''}
         <p class="note">每個符號和詞只留最新的一次錄音。錄音只存在這台裝置，不會上傳。</p>`
       : `<p class="note empty-v">還沒有錄音。到「認識符號」打開一個注音符號，按「🎤 我也說說看」。</p>
@@ -825,10 +893,12 @@ function roundTargets({ mode, focus }) {
   const t = shuffle(review);
   return [focus, t[0], focus, t[1], focus].filter(Boolean);
 }
-function confusables(s) { return [...new Set(CONFUSE.filter(g => g.includes(s)).join(''))].filter(c => c !== s); }
+function confusables(s) { return [...new Set(confuseList().filter(g => g.includes(s)).join(''))].filter(c => c !== s); }
+// letters that sound just like s (ABC c / k): never offered beside it — the child couldn't tell them apart
+const soundsSame = s => (Z.sameSound || []).filter(g => g.includes(s)).join('');
 // near-misses first (what kids really confuse), then other learned symbols, then same group, then anything
 function distractors(t, k, avoid = '') {
-  const taken = new Set([t, ...avoid]);
+  const taken = new Set([t, ...avoid, ...soundsSame(t)]);
   const take = list => shuffle(list.filter(c => !taken.has(c))).map(c => (taken.add(c), c));
   return [
     ...take(confusables(t)).slice(0, 2),
@@ -842,13 +912,15 @@ function makeQuestions(targets) {
   // A symbol that repeats in a round gets a different word / question type each time.
   const usedWords = new Set(), lastType = {};
   return targets.map(t => {
-    const fresh = SYM[t].words.filter(w => !usedWords.has(w));
-    const type = lastType[t] === 'A' ? 'B' : lastType[t] === 'B' ? (fresh.length ? pick(['A', 'B']) : 'A') : pick(['A', 'B']);
+    const words = SYM[t].words.filter(hasPic);   // ABC: a word whose picture isn't drawn yet (nor has an emoji) can't be shown
+    const fresh = words.filter(w => !usedWords.has(w));
+    const type = !words.length ? 'A' : lastType[t] === 'A' ? 'B' : lastType[t] === 'B' ? (fresh.length ? pick(['A', 'B']) : 'A') : pick(['A', 'B']);
     lastType[t] = type;
     if (type === 'A') return { type, t, opts: shuffle([t, ...distractors(t, 3)]) };
-    const w = pick(fresh.length ? fresh : SYM[t].words);
+    const w = pick(fresh.length ? fresh : words);
     usedWords.add(w);
-    return { type, t, w, opts: shuffle([t, ...distractors(t, 3, Z.words[w].zy)]) };
+    // no option may be another sound of the word (注音: any symbol in it; ABC: any letter of it)
+    return { type, t, w, opts: shuffle([t, ...distractors(t, 3, isEn() ? w : Z.words[w].zy)]) };
   });
 }
 function startRound(cfg) {
@@ -856,6 +928,8 @@ function startRound(cfg) {
   renderQ();
 }
 const TITLE = { A: '聽聲音，找到它！', B: '聽到哪一個音？' };
+// ABC's B question asks for the letter the word starts with (x: ends with)
+const titleOf = q => q.type === 'B' && isEn() ? (Z.words[q.w].pos === 'end' ? '最後是哪一個字母？' : '開頭是哪一個字母？') : TITLE[q.type];
 function promptSound(q) { return q.type === 'A' ? saySym(q.t) : sayWord(q.w); }
 
 function renderQ() {
@@ -864,12 +938,12 @@ function renderQ() {
   q.tries = 0; q.locked = false;
   const prompt = q.type === 'A'
     ? `<div class="q-prompt"><button class="play" data-act="replay" aria-label="再聽一次">🔊</button></div>`
-    // zhuyin hidden until answered — it would give the answer away
-    : `<div class="q-prompt"><button class="q-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}<span id="qword" class="zw">${esc(q.w)}</span></button></div>`;
+    // zhuyin (ABC: the whole word) hidden until answered — it would give the answer away
+    : `<div class="q-prompt"><button class="q-pic" data-act="replay" aria-label="再聽一次">${img(q.w)}<span id="qword" class="${isEn() ? 'ew' : 'zw'}">${isEn() ? '' : esc(q.w)}</span></button></div>`;
   app.innerHTML = `
     ${roundBar()}
     <div class="q">
-      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">${TITLE[q.type]}</div></div>
+      <div class="ask">${catEl('fei')}<div class="bubble" id="bubble">${titleOf(q)}</div></div>
       ${prompt}
       <div class="opts">${q.opts.map(o => `<button class="opt" data-act="answer" data-o="${o}">${o}</button>`).join('')}</div>
       <div class="fb" id="fb"></div>
@@ -880,12 +954,12 @@ function renderQ() {
   ACT.answer = el => answer(q, el);
   ACT.next = () => { hush(); G.k++; renderQ(); };
   // 菲菲 reads the instruction the first time each question type shows up in a round
-  const intro = !G.told[q.type];
-  G.told[q.type] = true;
+  const intro = !G.told[titleOf(q)];
+  G.told[titleOf(q)] = true;
   setTimeout(() => {
     // skip if the child already answered / left the page during the delay
     if (G?.qs[G.k] !== q || q.locked || q.tries || !location.hash.startsWith('#/practice')) return;
-    seq([...(intro ? narrate({ t: TITLE[q.type], ...FEI }, 200) : []), () => promptSound(q)]);
+    seq([...(intro ? narrate({ t: titleOf(q), ...FEI }, 200) : []), () => promptSound(q)]);
   }, 300);
 }
 // ✕ + one dot per question: green = first try, orange = needed help, yellow = now
@@ -939,7 +1013,7 @@ function showNext() {
 /* ============ game: 分類籃 (sort pictures into two baskets of easily-confused sounds) ============ */
 const SORT_N = 6;
 const PAIRS = CONFUSE.map(g => [...g].slice(0, 2));   // ㄐㄑㄒ plays as ㄐ / ㄑ
-const seenPair = p => p.filter(s => S.seen['zh:' + s]).length;
+const seenPair = p => p.filter(s => S.seen[LP() + s]).length;
 const sortPairs = () => PAIRS.filter(p => seenPair(p) === 2);
 const sortHint = () => PAIRS.slice().sort((p, q) => seenPair(q) - seenPair(p))[0];   // closest to unlocking
 // only words whose first syllable has exactly one of the pair: for 聲母 that means "starts with",
@@ -1270,7 +1344,7 @@ function spellSolved(q, symFirst, toneFirst = true) {
   G.newStickers.push(...unlockStickers());
   // B spelled right first time in 2 different rounds -> the word's picture joins the sticker book
   if (q.type === 'B' && firstTry) {
-    const rec = (S.spell['zh:' + q.w] ??= { ok: 0, round: 0 });
+    const rec = (S.spell[LP() + q.w] ??= { ok: 0, round: 0 });
     if (rec.round !== G.started) { rec.ok++; rec.round = G.started; }
     if (rec.ok >= 2 && giveSticker(Z.words[q.w].art)) G.newStickers.push(q.w);
     save();
@@ -1600,7 +1674,7 @@ function bossEnd() {
     G.beat = [];
     for (const p of new Set(G.qs.map(q => q.pair))) {
       const slips = G.qs.filter(q => q.pair === p).reduce((n, q) => n + q.slips, 0);
-      if (slips <= BOSS_SLIP && !pairWon(p)) { S.map['zh:' + p.join('')] = Date.now(); G.beat.push(p); }
+      if (slips <= BOSS_SLIP && !pairWon(p)) { S.map[LP() + p.join('')] = Date.now(); G.beat.push(p); }
     }
     G.wonLeg = !was && bossWon(G.leg - 1);
     save();
@@ -1723,7 +1797,7 @@ function teachGame() {
   if (spellCount() < TEACH_MIN) return go('');
   // words the child can read: all their symbols learned first, then seen, then anything
   const syms = w => [...Z.words[w].zy.replace(/[\sˊˇˋ˙]/g, '')];
-  const rank = w => syms(w).reduce((n, s) => n + (level(s) === 3 ? 0 : S.seen['zh:' + s] ? 1 : 3), 0) + Math.random() * 2;
+  const rank = w => syms(w).reduce((n, s) => n + (level(s) === 3 ? 0 : S.seen[LP() + s] ? 1 : 3), 0) + Math.random() * 2;
   const take = (list, n) => list.map(w => [rank(w), w]).sort((a, b) => a[0] - b[0]).slice(0, n).map(x => x[1]);
   const words = Object.keys(Z.words);
   const qs = [...take(words.filter(w => [...w].length === 1), TEACH_ONE), ...take(words.filter(w => [...w].length === 2), TEACH_TWO)]
@@ -1839,7 +1913,8 @@ function renderDone() {
 }
 
 /* ============ for parents: report, 建議多練, 獎狀 ============ */
-const AWARDS = [['i', '聲母'], ['m', '介音'], ['f', '韻母']];
+const AWARDS = { zh: [['i', '聲母'], ['m', '介音'], ['f', '韻母']], en: [['v', '母音'], ['c', '子音']] };
+const LANG_NAME = { zh: '注音', en: 'ABC' };
 // days with a stamp since Monday / since the 1st; the most-missed symbols and pair
 function report() {
   const now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
@@ -1847,15 +1922,15 @@ function report() {
   const month = Object.keys(S.days).filter(k => k.startsWith(dayKey().slice(0, 7))).length;
   const learned = Z.symbols.filter(x => level(x.s) === 3).length;
   const weak = Z.symbols.filter(x => stat(x.s).bad > 0).sort((a, b) => stat(b.s).bad - stat(a.s).bad).slice(0, 3).map(x => x.s);
-  const pair = PAIRS.map(p => [stat(p[0]).bad + stat(p[1]).bad, p]).filter(x => stat(x[1][0]).bad && stat(x[1][1]).bad)
+  const pair = (isEn() ? CONFUSE_EN.map(g => [...g]) : PAIRS).map(p => [stat(p[0]).bad + stat(p[1]).bad, p]).filter(x => stat(x[1][0]).bad && stat(x[1][1]).bad)
     .sort((a, b) => b[0] - a[0])[0]?.[1];
   return `<div class="panel">
-    <h3>練習紀錄</h3>
+    <h3>練習紀錄<small>・${LANG_NAME[LANG]}（首頁切換語言）</small></h3>
     <div class="stats">
       <div><b>${week}</b><span>本週練習天數</span></div>
       <div><b>${month}</b><span>${now.getMonth() + 1} 月練習天數</span></div>
       <div><b>${learned}<small> / ${Z.symbols.length}</small></b><span>學會的符號</span></div>
-      <div><b>${STICKERS.filter(x => S.stickers[x.art]).length}<small> / ${STICKERS.length}</small></b><span>貼紙</span></div>
+      <div><b>${STICKERS.filter(x => hasStk(x.art)).length}<small> / ${STICKERS.length}</small></b><span>貼紙</span></div>
     </div>
     <p class="note">今天玩了 ${S.days[dayKey()]?.rounds || 0} 輪。最常搞混：${pair ? `<b>${pair.join('／')}</b>（可以玩分類籃練習）` : '還沒有'}</p>
     <h3 class="sub">建議多練</h3>
@@ -1866,7 +1941,7 @@ function report() {
 
 // #/award/i: printable certificate once every symbol of the group is learned
 function award(g) {
-  const a = AWARDS.find(x => x[0] === g), list = Z.symbols.filter(x => x.g === g);
+  const a = AWARDS[LANG].find(x => x[0] === g), list = Z.symbols.filter(x => x.g === g);
   if (!a || list.some(x => level(x.s) !== 3)) return go('settings');
   const d = new Date(), name = S.settings.kidName;
   app.innerHTML = `
@@ -1949,7 +2024,7 @@ function settings() {
       <h3>獎狀</h3>
       <label for="kidName">孩子的名字（印在獎狀上）</label>
       <input id="kidName" type="text" maxlength="12" value="${esc(S.settings.kidName)}" placeholder="例如：小安" autocomplete="off">
-      <ul class="awards">${AWARDS.map(([g, name]) => {
+      <ul class="awards">${AWARDS[LANG].map(([g, name]) => {
         const list = Z.symbols.filter(x => x.g === g), got = list.filter(x => level(x.s) === 3).length;
         return `<li>${name}（${list.length} 個）：${got === list.length
           ? `<a href="#/award/${g}">🏅 看獎狀、列印</a>` : `學會 ${got} 個，還差 ${list.length - got} 個`}</li>`;
@@ -1968,7 +2043,9 @@ function settings() {
         （<a href="https://language.moe.gov.tw/001/Upload/files/site_content/M0001/juyin/index.html" target="_blank" rel="noopener">原始出處</a>）；本站僅剪除尾端空白、調整音量。</p>
       <p class="note"><b>範例詞（貓、冰淇淋…）</b>：以 Google Gemini 語音合成（gemini-3.8-flash-tts）產生，本站剪除前後空白、調整音量。</p>
       <p class="note"><b>胖胖、菲菲說話</b>：以 Google Gemini 語音合成（gemini-3.8-flash-tts）預先錄好。</p>
+      <p class="note"><b>英文字母、英文範例詞</b>：錄音還在準備中，先用這台裝置內建的英文語音（美式）。字母的「音」（/æ/、/b/）錄好之前，練習時念的是字母的名字。</p>
       <p class="note"><b>錄音播不出來時</b>：改用這台裝置內建的中文語音。</p>
+      <p class="note"><b>英文字型</b>：<a href="https://fonts.google.com/specimen/Andika" target="_blank" rel="noopener">Andika</a>（SIL Open Font License），給剛學認字的孩子設計的字型。</p>
     </div>`;
   $('#narrate').onchange = e => { S.settings.narrate = e.target.checked; save(); };
   $('#kidName').oninput = e => { S.settings.kidName = e.target.value.trim(); save(); };
@@ -1986,28 +2063,59 @@ function settings() {
   ACT.reset = () => { if (confirm('確定要清除所有練習紀錄（熟練度、貼紙、印章）嗎？')) { S.stats = {}; S.stickers = {}; S.days = {}; S.spell = {}; S.map = {}; save(); settings(); } };
 }
 
-/* ============ boot ============ */
-(async () => {
-  try {
-    [Z, ART] = await Promise.all(['data/zhuyin.json', 'data/art.json'].map(async u => (await fetch(u)).json()));
-  } catch {
-    app.innerHTML = '<p class="loading">資料載入失敗。請用網頁伺服器開啟（例如 <code>py -m http.server</code>），不要直接雙擊 index.html。</p>';
-    return;
-  }
+/* ============ languages ============ */
+// 注音 has every game; ABC so far has 認識字母, 聽音練習 and the sticker book (ROADMAP 4.5 E3) —
+// the other games' routes go home while ABC is on.
+const ZH_ONLY = new Set(['sort', 'memory', 'spell', 'bubbles', 'catch', 'boss', 'teach']);
+let drawnEn = null;
+async function useLang(l) {
+  LANG = DATA[l] ? l : 'zh';
+  Z = DATA[LANG];
+  GROUP_NAME = Z.groups;
+  SYM = {};
   for (const x of Z.symbols) SYM[x.s] = x;
+  // which ABC pictures exist yet (the rest show their emoji); 注音 has all of its pictures
+  if (isEn() && !drawnEn) {
+    const slugs = [...new Set(Object.values(Z.words).map(w => w.art))];
+    const ok = await Promise.all(slugs.map(a => fetch(`assets/img/${a}.webp`, { method: 'HEAD' }).then(r => r.ok, () => false)));
+    drawnEn = new Set(slugs.filter((_, i) => ok[i]));
+  }
+  DRAWN = isEn() ? drawnEn : null;
   // one sticker per picture; a picture shared by several symbols (杯子: ㄅ, ㄟ) unlocks via any of them
   const bySlug = {};
   for (const x of Z.symbols) for (const w of x.words) {
+    if (!hasPic(w)) continue;
     const a = Z.words[w].art;
     (bySlug[a] ??= { art: a, word: w, cat: ART[a]?.cat || 'object', syms: [] }).syms.push(x.s);
   }
   STICKERS = Object.values(bySlug);
+  unlockStickers();   // older saves: hand out stickers for symbols learned before the book existed
+  app.classList.toggle('en', isEn());
+  document.documentElement.lang = isEn() ? 'en' : 'zh-Hant-TW';
+}
+async function setLang(l) {
+  if (l === LANG) return;
+  hush();
+  G = null;
+  S.settings.lang = l; save();
+  await useLang(l);
+  route();
+}
+
+/* ============ boot ============ */
+(async () => {
+  try {
+    [DATA.zh, DATA.en, ART] = await Promise.all(['data/zhuyin.json', 'data/abc.json', 'data/art.json'].map(async u => (await fetch(u)).json()));
+  } catch {
+    app.innerHTML = '<p class="loading">資料載入失敗。請用網頁伺服器開啟（例如 <code>py -m http.server</code>），不要直接雙擊 index.html。</p>';
+    return;
+  }
   // 拼拼看 uses the one-character words; their Gemini clip doubles as the syllable's sound
-  ONE = Object.keys(Z.words).filter(w => [...w].length === 1).map(w => {
-    const p = parseSyl(Z.words[w].zy);
+  ONE = Object.keys(DATA.zh.words).filter(w => [...w].length === 1).map(w => {
+    const p = parseSyl(DATA.zh.words[w].zy);
     return { w, p, parts: sylParts(p), tone: TONE_MARK[p.t] };
   });
-  unlockStickers();   // older saves: hand out stickers for symbols learned before the book existed
+  await useLang(S.settings.lang);
   document.body.insertAdjacentHTML('beforeend', CAT_DEFS());
   route();
 })();

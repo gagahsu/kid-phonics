@@ -107,6 +107,12 @@ img { display: block; max-width: 100%; }
 .g-i { background: var(--gi-bg); color: var(--gi); }
 .g-m { background: var(--gm-bg); color: var(--gm); }
 .g-f { background: var(--gf-bg); color: var(--gf); }
+/* ABC: consonants in the 聲母 blue, vowels in the 韻母 red */
+.g-c { background: var(--gi-bg); color: var(--gi); }
+.g-v { background: var(--gf-bg); color: var(--gf); }
+.isle.learned.g-c { background: var(--gi); color: #fff; }
+.isle.learned.g-v { background: var(--gf); color: #fff; }
+.tile-key { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 14px; font-weight: 700; margin-right: 6px; }
 .dots { position: absolute; bottom: 6px; left: 0; right: 0; display: flex; justify-content: center; gap: 3px; }
 .dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(31,42,68,.13); }
 .dots i.on { background: var(--yellow); box-shadow: 0 0 0 1.5px #E5A800 inset; }
@@ -140,6 +146,16 @@ img { display: block; max-width: 100%; }
 .card:active { transform: translateY(2px); }
 .card img { width: 100%; max-width: 140px; aspect-ratio: 1; object-fit: contain; }
 .card.speaking { border-color: var(--yellow); animation: pulse .5s ease; }
+
+/* ABC: letters in Andika (single-storey a and g, like children's books); Chinese text falls through to 楷書 */
+#app.en { --kai: "Andika", "LXGW WenKai TC", "BiauKai", "DFKai-SB", "Kaiti TC", "STKaiti", serif; }
+#app.en .tile { font-size: 34px; }
+/* an English word: its letters in a row, the one being taught in red */
+.ew { display: inline-flex; font-family: "Andika", var(--ui); font-size: 30px; line-height: 1.1; letter-spacing: .02em; }
+.ew b { font-weight: 400; }
+.ew b.hi { color: var(--red); font-weight: 700; }
+.stk .cap .ew { font-size: 20px; }
+.vrow .vword .ew { font-size: 22px; }
 
 /* word with zhuyin to the right of each character (textbook layout) */
 .zw { display: inline-flex; align-items: center; font-family: var(--kai); font-size: 30px; line-height: 1; }

@@ -10,14 +10,16 @@ py -m http.server 8901 --bind 127.0.0.1
 開 http://127.0.0.1:8901 。不能直接雙擊 index.html（瀏覽器擋 file:// 讀 JSON）。
 手機測試：改 `--bind 0.0.0.0`，手機連同一個 Wi-Fi 開 `http://<電腦IP>:8901`。
 
-網站檔案：`index.html`、`style.css`、`app.js`（純 JS，無建置步驟），讀 `data/zhuyin.json` 與 `assets/img/`。
+網站檔案：`index.html`、`style.css`、`app.js`（純 JS，無建置步驟），讀 `data/zhuyin.json`、`data/abc.json` 與 `assets/img/`。
+首頁的「注音／ABC」切換語言（ABC 進度見 ROADMAP P4）。
 練習紀錄存在瀏覽器 localStorage（`kidphonics.v1`）。
 
 ## 目錄
 
 ```
 data/zhuyin.json     注音符號 → 範例詞（含注音），詞 → 圖 slug
-data/art.json        共用圖庫：slug → 英文繪圖描述 + 類別（決定要不要畫臉）
+data/abc.json        英文字母 → 範例詞（美式 IPA、拼拼看用的 CVC 拼法），格式同上
+data/art.json        共用圖庫：slug → 英文繪圖描述 + 類別（決定要不要畫臉）；`emoji` = 圖還沒畫好時網站先顯示的 emoji
 prompts/             build_prompts.py 產生，貼到 ChatGPT 的生圖 prompt（可隨時重產）
 sheets/              網格原圖 sheet_NN.png + 對應名單 sheet_NN.names.txt（不要刪）
 work/sheet_NN/       crop.py 裁切結果（可隨時重切）
@@ -127,6 +129,17 @@ py tools/split_tts.py work/tts/cat_fei.txt --out assets/audio/zh/fei
 抓錯遊戲用的 33 個一字詞先錄、每個附拼音聲調提示；其餘 121 個給教胖胖用，一字詞附提示、多字詞只帶 `tts_hints.tsv`
 （`work/tts/teach_word_1|2/`）。檔名規則同 `word/`；缺檔時改播 `word/` 的錄音。**新增範例詞時這裡也要補錄。**
 補錄、重念用 `--style pang-word --voice Puck`：`pang` style 太興奮，會把四聲念上去（爸爸 → ㄅㄚˊㄅㄚˊ，2026-10-15 用 `pang-word` 重念 爸爸、皮球）。
+
+## 英文錄音（ABC，尚未錄）
+
+網站會找這些檔案，沒有的話：英文詞、字母名稱改用裝置的英文語音；字母的音不念（只念名稱）。
+
+```
+assets/audio/en/name/a.mp3     字母名稱（A = /eɪ/）
+assets/audio/en/sound/a.mp3    字母的音（a = /æ/），第一期每個字母一個音
+assets/audio/en/word/apple.mp3 範例詞，檔名就是詞（yo-yo.mp3）
+assets/audio/en/pang-word/     胖胖念的英文詞（抓錯、教胖胖用，E5）
+```
 
 ## 注音校對
 
