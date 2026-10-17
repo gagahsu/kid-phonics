@@ -34,7 +34,7 @@
 | P3 | 3.5 教胖胖（排在 3.3 之前） | 3.2 | ☑（2026-10-15） |
 | P3 | 3.3 錄音跟讀 | — | ☑（2026-10-15） |
 | P3 | 3.4 家長端：陪練說明、週報、獎狀 | 1.3 | ☑（2026-10-15） |
-| P4 | ABC：英文字母＋自然發音（E1–E6） | 待決定 ①–⑤ | ☐ 規劃中（2026-10-16） |
+| P4 | ABC：英文字母＋自然發音（E1–E6） | — | ☐ E1 進行中：`abc.json` 草稿、63 張新圖待畫（2026-10-17） |
 
 ---
 
@@ -444,7 +444,7 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
 聽音練習、各種遊戲、闖關地圖、家長端都沿用。指示語、稱讚、胖胖菲菲的台詞**維持中文**（孩子的母語），
 只有教的內容（字母、字母音、英文詞）是英文。0 的設計原則全部適用。
 
-### 4.0 教什麼（待決定，見文末 ①②③⑤）
+### 4.0 教什麼（2026-10-17 決定，見文末）
 
 - **字母音為主，字母名稱為輔**（建議）：符號頁念「A（名稱）…/æ/（字母音）…apple」；聽音練習、拼拼看考**字母音**，
   因為拼字靠的是音，不是名稱。字母名稱留在符號頁和 ABC 歌式的複習。
@@ -473,9 +473,14 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
   - 能畫成圖、5–7 歲認得的東西，跟注音一樣不用動作或抽象詞（up、under 這類不收）。
 - `sp`：拼拼看用，**CVC 三個字母的字**（cat、dog、pig、bus、sun、hat、bed、cup、fox、hen、box、net…），
   一個空格隔開一個音。拼拼看只出有 `sp` 的詞。
-- 圖片：現有 152 張裡，粗估能用的約 65 張（cat、dog、bus、bee、fish、frog、hat、lion、pig、sun、umbrella、whale、egg、elephant…），
-  **約 45–55 張要新畫**（i、j、k、n、o、q、v、x、y、z 幾乎全缺：igloo、jam、key、nest、octopus、queen、van、fox、yo-yo、zebra…）。
-  流程照 README「圖卡製作流程」，art.json 加新 slug 即可。
+- 圖片：121 個詞裡 58 個用現有的圖（hen 用現有的 chicken「a hen」），**63 張要新畫**（i、j、k、n、o、q、v、x、y、z 幾乎全缺），
+  已加進 `art.json`。流程照 README「圖卡製作流程」：`build_prompts.py` 會排成 sheet_14～19。
+
+**E1 草稿（2026-10-17）**：`data/abc.json` 26 個字母、121 個詞（每字母 2–5 個：u 只有 umbrella、umpire，q、x、y、z 各 3–4 個，
+跟注音的 ㄦ 只有 2 個詞一樣），其中 24 個 CVC 字有 `sp`，五個短母音都有（a：cat fan hat jam van；e：bed hen jet net web；
+i：pig wig；o：dog log mop pot box fox；u：bus cup nut rug sun tub）。
+每個詞附美式 IPA（`ipa`），**還沒對照字典**。數字（six、ten、zero）不收，因為圖不能有文字；x 用 box、fox、ax、ox。
+c 和 k 同一個音，`sameSound` 標起來，聽音題不可同時出現。地圖分段：a–e、f–j、k–o、p–t、u–z。
 - 英文詞的拼法、讀音要逐詞對照字典（例：Merriam-Webster Learner's 或 Cambridge 美式音），跟注音校對一樣記錄已對照哪些。
 
 ### 4.2 錄音（先完成再寫程式，記取 0.1 的教訓）
@@ -483,7 +488,7 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
 | 內容 | 數量 | 路徑 | 來源 |
 |---|---|---|---|
 | 字母名稱 | 26 | `assets/audio/en/name/a.mp3` | Gemini TTS（英文是它的強項） |
-| 字母音 | 26（第一期） | `assets/audio/en/sound/a.mp3` | **待決定 ④**，最難的一塊 |
+| 字母音 | 26（第一期） | `assets/audio/en/sound/a.mp3` | 先找開放授權真人錄音（④），最難的一塊 |
 | 範例詞 | 約 130 | `assets/audio/en/word/apple.mp3` | Gemini TTS，美式、慢速 |
 | 胖胖念的英文詞 | 抓錯、教胖胖要用 | `assets/audio/en/pang-word/` | Gemini TTS `--style pang-word --voice Puck` |
 
@@ -533,7 +538,7 @@ let L = LANGS[S.settings.lang ??= 'zh'];
 
 | 階段 | 內容 | 依賴 |
 |---|---|---|
-| E1 | `abc.json`（字母、範例詞、字典校對）＋新圖 | ①②③⑤ 決定 |
+| E1 | `abc.json`（字母、範例詞、字典校對）＋新圖 | — |
 | E2 | 錄音：字母名稱、字母音、範例詞；`review.html` 試聽確認 | E1、④ |
 | E3 | 語言抽象＋語言切換＋認識字母＋聽音練習＋貼紙分語言 | E2 |
 | E4 | 分類籃、翻牌、泡泡、闖關地圖、大對決 | E3 |
@@ -552,14 +557,16 @@ E3 做完就可以先上線給孩子玩（跟注音一開始一樣：認識＋�
 
 長母音（a_e、ee…）、雙字母（sh ch th ck）、常見字（sight words：the、I、a…）、字母書寫筆順。
 
-### 待決定（ABC）
+### 決定（ABC）
 
-- ① **考字母音還是字母名稱**：建議兩個都教、題目考字母音。
-- ② **字母順序**：A–Z（跟學校、ABC 歌、家長的習慣一樣，建議）或 Jolly Phonics 的 s a t i p n（學 6 個就能拼 sat、pin、tap，拼拼看能更早開）。
-- ③ **美式或英式**：建議美式。
-- ④ **字母音的錄音來源**：Gemini 試做＋嚴格試聽；或找開放授權的真人錄音（要查授權，像 0.1 那樣）。建議先找開放授權來源，找不到再用 Gemini。
-- ⑤ **大小寫**：建議圖卡「Aa」、遊戲用小寫。
-- ⑥ 吉祥物的英文台詞要不要有（例：胖胖說「Good job!」）：建議 E6 再說，先全部中文。
+2026-10-17 全部照建議決定：
+
+- ① 兩個都教，題目考**字母音**。
+- ② 字母順序 **A–Z**（不用 s a t i p n）。
+- ③ **美式**。
+- ④ 字母音錄音：**先找開放授權的真人錄音**，找不到再用 Gemini 試做＋嚴格試聽。
+- ⑤ 圖卡「Aa」、遊戲用**小寫**。
+- ⑥ 吉祥物英文台詞 **E6 再做**，先全部中文。
 
 ---
 

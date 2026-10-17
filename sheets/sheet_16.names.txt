@@ -1,0 +1,12 @@
+kangaroo
+log
+mop
+nest
+net
+nose
+nut
+noodles
+octopus
+otter
+ostrich
+olive

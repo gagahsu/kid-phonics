@@ -1,0 +1,12 @@
+ant
+alligator
+astronaut
+elbow
+elf
+envelope
+fan
+goat
+gift
+gorilla
+guitar
+igloo
