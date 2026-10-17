@@ -15,7 +15,7 @@ empty space around it; objects must not touch or overlap each other.
 Pure white background. No text, no letters, no numbers, no borders,
 no grid lines. Each cell shows exactly one subject as described.
 
-Row 1 (left to right): a queen with a crown and a long purple dress; a folded patchwork quilt (no face); a small round quail (with a friendly face: dot eyes, rosy cheeks)
-Row 2: a rectangular striped rug with fringe (no face); a friendly toy robot (no face); a bathtub full of bubbles (no face)
-Row 3: a baseball umpire in a face mask and chest protector; a small family van (with a friendly face: dot eyes, rosy cheeks); a vase with flowers (no face)
-Row 4: a knitted sleeveless vest (no face); a violin with its bow (no face); a volcano puffing a little smoke (no face)
+Row 1 (left to right): a folded patchwork quilt (no face); a small round quail (with a friendly face: dot eyes, rosy cheeks); a rectangular striped rug with fringe (no face)
+Row 2: a friendly toy robot (no face); a bathtub full of bubbles (no face); a baseball umpire in a face mask and chest protector
+Row 3: a small family van (with a friendly face: dot eyes, rosy cheeks); a vase with flowers (no face); a knitted sleeveless vest (no face)
+Row 4: a violin with its bow (no face); a volcano puffing a little smoke (no face); a round spider web, no spider (no face)

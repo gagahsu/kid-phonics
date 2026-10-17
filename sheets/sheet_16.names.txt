@@ -1,4 +1,3 @@
-kangaroo
 log
 mop
 nest
@@ -8,5 +7,6 @@ nut
 noodles
 octopus
 otter
-ostrich
 olive
+omelet
+queen

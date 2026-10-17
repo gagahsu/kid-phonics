@@ -1,4 +1,3 @@
-web
 wig
 worm
 box
@@ -10,3 +9,4 @@ yak
 yarn
 yogurt
 zebra
+zoo

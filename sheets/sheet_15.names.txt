@@ -1,6 +1,5 @@
 insect
 ink
-iguana
 inchworm
 jam
 jet
@@ -10,3 +9,4 @@ jellyfish
 key
 king
 koala
+kangaroo

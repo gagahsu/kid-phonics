@@ -15,7 +15,7 @@ empty space around it; objects must not touch or overlap each other.
 Pure white background. No text, no letters, no numbers, no borders,
 no grid lines. Each cell shows exactly one subject as described.
 
-Row 1 (left to right): a round spider web, no spider (no face); a curly rainbow party wig (no face); a pink earthworm (with a friendly face: dot eyes, rosy cheeks)
-Row 2: a closed plain cardboard box (no face); an orange fox with a white-tipped tail (with a friendly face: dot eyes, rosy cheeks); a small wood-chopping axe with a wooden handle (no face)
-Row 3: a brown ox with big curved horns (with a friendly face: dot eyes, rosy cheeks); a red yo-yo on its string (no face); a shaggy brown yak (with a friendly face: dot eyes, rosy cheeks)
-Row 4: a ball of red yarn (no face); a cup of yogurt with a spoon, no label (no face); a zebra (with a friendly face: dot eyes, rosy cheeks)
+Row 1 (left to right): a curly rainbow party wig (no face); a pink earthworm (with a friendly face: dot eyes, rosy cheeks); a closed plain cardboard box (no face)
+Row 2: an orange fox with a white-tipped tail (with a friendly face: dot eyes, rosy cheeks); a small wood-chopping axe with a wooden handle (no face); a brown ox with big curved horns (with a friendly face: dot eyes, rosy cheeks)
+Row 3: a red yo-yo on its string (no face); a shaggy brown yak (with a friendly face: dot eyes, rosy cheeks); a ball of red yarn (no face)
+Row 4: a cup of yogurt with a spoon, no label (no face); a zebra (with a friendly face: dot eyes, rosy cheeks); a zoo gate with a giraffe and an elephant behind it, no sign or text (no face)

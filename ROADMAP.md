@@ -34,7 +34,7 @@
 | P3 | 3.5 教胖胖（排在 3.3 之前） | 3.2 | ☑（2026-10-15） |
 | P3 | 3.3 錄音跟讀 | — | ☑（2026-10-15） |
 | P3 | 3.4 家長端：陪練說明、週報、獎狀 | 1.3 | ☑（2026-10-15） |
-| P4 | ABC：英文字母＋自然發音（E1–E6） | — | ☐ E1 進行中：`abc.json` 草稿、63 張新圖待畫（2026-10-17） |
+| P4 | ABC：英文字母＋自然發音（E1–E6） | — | ☐ E1 進行中：`abc.json` 已對照 CMUdict、62 張新圖待畫（2026-10-17） |
 
 ---
 
@@ -473,14 +473,26 @@ S.days ??= {};   // 'YYYY-MM-DD'（本地時區）-> {rounds, stamp}
   - 能畫成圖、5–7 歲認得的東西，跟注音一樣不用動作或抽象詞（up、under 這類不收）。
 - `sp`：拼拼看用，**CVC 三個字母的字**（cat、dog、pig、bus、sun、hat、bed、cup、fox、hen、box、net…），
   一個空格隔開一個音。拼拼看只出有 `sp` 的詞。
-- 圖片：121 個詞裡 58 個用現有的圖（hen 用現有的 chicken「a hen」），**63 張要新畫**（i、j、k、n、o、q、v、x、y、z 幾乎全缺），
+- 圖片：120 個詞裡 58 個用現有的圖（hen 用現有的 chicken「a hen」），**62 張要新畫**（i、j、k、n、o、q、v、x、y、z 幾乎全缺），
   已加進 `art.json`。流程照 README「圖卡製作流程」：`build_prompts.py` 會排成 sheet_14～19。
 
-**E1 草稿（2026-10-17）**：`data/abc.json` 26 個字母、121 個詞（每字母 2–5 個：u 只有 umbrella、umpire，q、x、y、z 各 3–4 個，
+**E1 草稿（2026-10-17）**：`data/abc.json` 26 個字母、120 個詞（每字母 2–5 個：u 只有 umbrella、umpire，i、o、q、x、y、z 各 3–4 個，
 跟注音的 ㄦ 只有 2 個詞一樣），其中 24 個 CVC 字有 `sp`，五個短母音都有（a：cat fan hat jam van；e：bed hen jet net web；
 i：pig wig；o：dog log mop pot box fox；u：bus cup nut rug sun tub）。
-每個詞附美式 IPA（`ipa`），**還沒對照字典**。數字（six、ten、zero）不收，因為圖不能有文字；x 用 box、fox、ax、ox。
+每個詞附美式 IPA（`ipa`）。數字（six、ten、zero）不收，因為圖不能有文字；x 用 box、fox、ax、ox。
 c 和 k 同一個音，`sameSound` 標起來，聽音題不可同時出現。地圖分段：a–e、f–j、k–o、p–t、u–z。
+
+**字典校對（2026-10-17）**：全部詞對照 [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict)（美式發音，BSD 授權，
+用 `pip install cmudict`），檢查拼法（辭典有收）、開頭音是不是該字母的主要音（x 查結尾 /ks/）、CVC 字是不是三個音。
+
+| 詞 | 問題 | 處理 |
+|---|---|---|
+| iguana | CMU 只收 /aɪˈɡwɑnə/（開頭是 eye，不是短 i） | 拿掉，i 剩 4 個詞 |
+| ostrich | CMU 是 /ˈɔstrɪtʃ/，跟 o 要教的 /ɑ/ 不同 | 換成 omelet /ˈɑmlət/ |
+| inchworm | CMU 沒收 | 保留：inch /ɪntʃ/＋worm 兩個都有收 |
+| dog、log | CMU 是 /ɔ/（不是 /ɑ/） | 保留：美式 phonics 教短 o 的標準例字，拼拼看只考字母 |
+
+其他差異都是輕音母音的寫法（alligator、astronaut、octopus、penguin），不影響開頭音，`ipa` 小修。
 - 英文詞的拼法、讀音要逐詞對照字典（例：Merriam-Webster Learner's 或 Cambridge 美式音），跟注音校對一樣記錄已對照哪些。
 
 ### 4.2 錄音（先完成再寫程式，記取 0.1 的教訓）

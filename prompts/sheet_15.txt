@@ -15,7 +15,7 @@ empty space around it; objects must not touch or overlap each other.
 Pure white background. No text, no letters, no numbers, no borders,
 no grid lines. Each cell shows exactly one subject as described.
 
-Row 1 (left to right): a beetle-like insect with six legs and antennae (with a friendly face: dot eyes, rosy cheeks); a small glass bottle of blue ink with an ink drop beside it, no label (no face); a green iguana (with a friendly face: dot eyes, rosy cheeks)
-Row 2: a green inchworm arching its back (with a friendly face: dot eyes, rosy cheeks); a glass jar of red strawberry jam, no label (no face); a small white jet plane on the ground, seen from the side (with a friendly face: dot eyes, rosy cheeks)
-Row 3: a glass of orange juice (no face); a zip-up jacket (no face); a pink jellyfish with wavy tentacles (with a friendly face: dot eyes, rosy cheeks)
-Row 4: a golden key (no face); a king with a crown and a red cape; a koala hugging a branch (with a friendly face: dot eyes, rosy cheeks)
+Row 1 (left to right): a beetle-like insect with six legs and antennae (with a friendly face: dot eyes, rosy cheeks); a small glass bottle of blue ink with an ink drop beside it, no label (no face); a green inchworm arching its back (with a friendly face: dot eyes, rosy cheeks)
+Row 2: a glass jar of red strawberry jam, no label (no face); a small white jet plane on the ground, seen from the side (with a friendly face: dot eyes, rosy cheeks); a glass of orange juice (no face)
+Row 3: a zip-up jacket (no face); a pink jellyfish with wavy tentacles (with a friendly face: dot eyes, rosy cheeks); a golden key (no face)
+Row 4: a king with a crown and a red cape; a koala hugging a branch (with a friendly face: dot eyes, rosy cheeks); a kangaroo with a baby in its pouch (with a friendly face: dot eyes, rosy cheeks)

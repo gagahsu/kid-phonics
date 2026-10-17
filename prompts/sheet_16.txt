@@ -15,7 +15,7 @@ empty space around it; objects must not touch or overlap each other.
 Pure white background. No text, no letters, no numbers, no borders,
 no grid lines. Each cell shows exactly one subject as described.
 
-Row 1 (left to right): a kangaroo with a baby in its pouch (with a friendly face: dot eyes, rosy cheeks); a wooden log lying on its side (no face); a mop with a wooden handle (no face)
-Row 2: a bird nest with three eggs in it (no face); a butterfly net with a long handle (no face); a nose (no face)
-Row 3: a whole walnut in its shell (no face); a bowl of noodles with chopsticks (no face); a purple octopus (with a friendly face: dot eyes, rosy cheeks)
-Row 4: a sea otter floating on its back (with a friendly face: dot eyes, rosy cheeks); an ostrich (with a friendly face: dot eyes, rosy cheeks); three green olives on a small leafy twig (no face)
+Row 1 (left to right): a wooden log lying on its side (no face); a mop with a wooden handle (no face); a bird nest with three eggs in it (no face)
+Row 2: a butterfly net with a long handle (no face); a nose (no face); a whole walnut in its shell (no face)
+Row 3: a bowl of noodles with chopsticks (no face); a purple octopus (with a friendly face: dot eyes, rosy cheeks); a sea otter floating on its back (with a friendly face: dot eyes, rosy cheeks)
+Row 4: three green olives on a small leafy twig (no face); a folded yellow omelet on a plate (no face); a queen with a crown and a long purple dress

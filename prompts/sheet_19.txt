@@ -1,5 +1,5 @@
 Create a landscape image (3:2 ratio) containing a single row
-of 3 separate illustrations for a 6-year-old's phonics app.
+of 2 separate illustrations for a 6-year-old's phonics app.
 
 Style: cute sticker illustrations with a gentle 3D feel — chunky rounded
 puffy shapes with soft inner shading, like inflated vinyl toys, but with
@@ -15,4 +15,4 @@ empty space around it; objects must not touch or overlap each other.
 Pure white background. No text, no letters, no numbers, no borders,
 no grid lines. Each cell shows exactly one subject as described.
 
-Left to right: a zoo gate with a giraffe and an elephant behind it, no sign or text (no face); a zipper, half open (no face); a green zucchini (no face)
+Left to right: a zipper, half open (no face); a green zucchini (no face)
