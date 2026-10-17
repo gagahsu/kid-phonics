@@ -1,0 +1,21 @@
+Create a portrait image (2:3 ratio) containing a 3-column by 4-row grid
+of 12 separate illustrations for a 6-year-old's phonics app.
+
+Style: cute sticker illustrations with a gentle 3D feel — chunky rounded
+puffy shapes with soft inner shading, like inflated vinyl toys, but with
+a thick dark-navy outline (#1F2A44) and a thick white sticker border
+around each object. Bold, cheerful, saturated colors limited to:
+cherry red #FF5A5F, sunny yellow #FFC93C, grass green #3BC47A,
+sky blue #3FA9F5, grape purple #9B6BFF, tangerine #FF9A3C
+(plus natural colors where needed, e.g. brown wood, white milk).
+No drop shadows, no ground.
+
+Layout rules: each illustration is centered in its own cell with generous
+empty space around it; objects must not touch or overlap each other.
+Pure white background. No text, no letters, no numbers, no borders,
+no grid lines. Each cell shows exactly one subject as described.
+
+Row 1 (left to right): a kangaroo with a baby in its pouch (with a friendly face: dot eyes, rosy cheeks); a wooden log lying on its side (no face); a mop with a wooden handle (no face)
+Row 2: a bird nest with three eggs in it (no face); a butterfly net with a long handle (no face); a nose (no face)
+Row 3: a whole walnut in its shell (no face); a bowl of noodles with chopsticks (no face); a purple octopus (with a friendly face: dot eyes, rosy cheeks)
+Row 4: a sea otter floating on its back (with a friendly face: dot eyes, rosy cheeks); an ostrich (with a friendly face: dot eyes, rosy cheeks); three green olives on a small leafy twig (no face)

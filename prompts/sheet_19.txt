@@ -1,0 +1,18 @@
+Create a landscape image (3:2 ratio) containing a single row
+of 3 separate illustrations for a 6-year-old's phonics app.
+
+Style: cute sticker illustrations with a gentle 3D feel — chunky rounded
+puffy shapes with soft inner shading, like inflated vinyl toys, but with
+a thick dark-navy outline (#1F2A44) and a thick white sticker border
+around each object. Bold, cheerful, saturated colors limited to:
+cherry red #FF5A5F, sunny yellow #FFC93C, grass green #3BC47A,
+sky blue #3FA9F5, grape purple #9B6BFF, tangerine #FF9A3C
+(plus natural colors where needed, e.g. brown wood, white milk).
+No drop shadows, no ground.
+
+Layout rules: each illustration is centered in its own cell with generous
+empty space around it; objects must not touch or overlap each other.
+Pure white background. No text, no letters, no numbers, no borders,
+no grid lines. Each cell shows exactly one subject as described.
+
+Left to right: a zoo gate with a giraffe and an elephant behind it, no sign or text (no face); a zipper, half open (no face); a green zucchini (no face)
